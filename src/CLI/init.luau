@@ -66,7 +66,7 @@ end
 
 local function PrintHelpMessage()
 	print(Color(Style("USAGE:", "bold"), "yellow"))
-	print("\tblink.exe [CONFIG] [OPTIONS]")
+	print("\tblink [CONFIG] [OPTIONS]")
 	print(Color(Style("OPTIONS:", "bold"), "yellow"))
 
 	local Sorted: { Argument } = {}
@@ -85,11 +85,15 @@ local function PrintHelpMessage()
 			`\t{stdio.color("green")}{table.concat(Argument.Aliases, ", ")}{stdio.color("reset")}\t{Argument.Description}`
 		)
 	end
+
+	print("blink-plus, a fork of Blink: https://github.com/Acidgorgon/blink-plus")
 end
 
 ---- Main ----
 
-print(`{Color("Blink", "green")} {_G.VERSION or "DEBUG"}`)
+-- blink-plus keeps the "Blink<suffix> <version>" shape so tools that parse the
+-- banner with /Blink\S*\s+(\d+\.\d+\.\d+\S*)/ still read the version.
+print(`{Color("Blink+", "green")} {_G.VERSION or "DEBUG"}`)
 
 local RawArguments = process.args
 if #RawArguments < 1 then

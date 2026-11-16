@@ -52,7 +52,7 @@ local EXPAND_TWEEN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirect
 
 ---- Constants ----
 
-local Toolbar = plugin:CreateToolbar("Blink Suite")
+local Toolbar = plugin:CreateToolbar("Current")
 local EditorButton = Toolbar:CreateButton("Editor", "Opens the configuration editor", "rbxassetid://118423040995617")
 EditorButton.ClickableWhenViewportHidden = true
 
@@ -75,7 +75,7 @@ ErrorInterface.Parent = ErrorWidget
 local ErrorText: TextLabel = ErrorInterface.Text
 
 local EditorWidget = plugin:CreateDockWidgetPluginGui("Configuration Editor", EDITOR_WIDGET)
-EditorWidget.Name = "Blink Editor"
+EditorWidget.Name = "Current Editor"
 EditorWidget.Title = "Configuration Editor"
 EditorWidget.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
@@ -220,7 +220,7 @@ local function GenerateFile(File: StringValue, Directory: Instance)
 
 	if not RequestScriptPermissions() then
 		ShowError("File generation failed, plugin doesn't have script inject permissions.")
-		warn("[BLINK]: File generation failed, plugin doesn't have script inject permissions.")
+		warn("[CURRENT]: File generation failed, plugin doesn't have script inject permissions.")
 		return
 	end
 
@@ -228,21 +228,21 @@ local function GenerateFile(File: StringValue, Directory: Instance)
 	local ClientSource = Generator.Generate("Client", AbstractSyntaxTree)
 	local TypesSource = Generator.GenerateShared(AbstractSyntaxTree)
 
-	local BlinkFolder: Folder = Directory:FindFirstChild("Blink") :: Folder
-	if not BlinkFolder then
+	local OutputFolder: Folder = Directory:FindFirstChild("Current") :: Folder
+	if not OutputFolder then
 		local Folder = Instance.new("Folder")
-		Folder.Name = "Blink"
+		Folder.Name = "Current"
 		Folder.Parent = Directory
-		BlinkFolder = Folder
+		OutputFolder = Folder
 	end
 
 	--> Clear previous files
-	BlinkFolder:ClearAllChildren()
+	OutputFolder:ClearAllChildren()
 
 	--> Generate output files
-	CreateModuleScript("Types", TypesSource, BlinkFolder)
-	CreateModuleScript("Server", ServerSource, BlinkFolder)
-	CreateModuleScript("Client", ClientSource, BlinkFolder)
+	CreateModuleScript("Types", TypesSource, OutputFolder)
+	CreateModuleScript("Server", ServerSource, OutputFolder)
+	CreateModuleScript("Client", ClientSource, OutputFolder)
 end
 
 local function LoadFile(File: StringValue)
@@ -411,7 +411,7 @@ local function OnQuickClear()
 end
 
 local function OnImport()
-	local File: File? = StudioService:PromptImportFile({ "blink", "txt" })
+	local File: File? = StudioService:PromptImportFile({ "blink", "current", "txt" })
 	if not File then
 		return
 	end

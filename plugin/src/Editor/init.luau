@@ -507,7 +507,7 @@ local function OnAnalysisErrorChanged()
 
 	--> Error message
 	local Message =
-		`{Error.GetNameFromCode(Error.Code)}: {Error.RawMessage} <font transparency="0.5"><i>Blink({Error.Code})</i></font>`
+		`{Error.GetNameFromCode(Error.Code)}: {Error.RawMessage} <font transparency="0.5"><i>Current({Error.Code})</i></font>`
 	for _, Label in Labels do
 		local Line = Utility.GetCurrentLine(Input.Text, Label.Span.Start)
 		Message ..= `\n{Label.Text} [L{Line}]`
@@ -867,7 +867,7 @@ function Editor.Initialize(Widget: DockWidgetPluginGui)
 	--> Preload fira sans
 	ContentProvider:PreloadAsync({ Display }, function(AssetId: string, AssetFetchStatus: Enum.AssetFetchStatus)
 		if AssetId ~= "" and AssetFetchStatus ~= Enum.AssetFetchStatus.Success then
-			warn("[BLINK] There was an issue preloading the editors font.")
+			warn("[CURRENT] There was an issue preloading the editors font.")
 		end
 	end)
 

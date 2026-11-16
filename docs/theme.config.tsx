@@ -7,7 +7,7 @@ const config: DocsThemeConfig = {
 		const { asPath } = useRouter()
 		if (asPath !== "/") {
 			return {
-				titleTemplate: "%s – Blink",
+				titleTemplate: "%s – Current",
 			}
 		}
 	},
@@ -16,21 +16,23 @@ const config: DocsThemeConfig = {
         <img
           width="40"
           height="40"
-          src="https://raw.githubusercontent.com/1Axen/blink/main/docs/public/letter.png"
+          alt="Current"
+          src="https://raw.githubusercontent.com/Acidgorgon/current/main/docs/public/letter.png"
         />
+        <span style={{ marginLeft: '.6em', fontWeight: 700 }}>Current</span>
       </>
   ),
   project: {
-    link: 'https://github.com/1Axen/blink',
+    link: 'https://github.com/Acidgorgon/current',
   },
-  docsRepositoryBase: 'https://github.com/1Axen/blink',
+  docsRepositoryBase: 'https://github.com/Acidgorgon/current/tree/main/docs',
   footer: {
-    text: '© 2024 Blink',
+    text: 'Current, a fork of Blink by 1Axen',
   },
   head: (
     <>
-      <link rel="shortcut icon" href="https://raw.githubusercontent.com/1Axen/blink/main/docs/public/letter.png" type="img/png"/>
-      <meta property="og:description" content="An IDL compiler written in Luau for ROBLOX buffer networking." />
+      <link rel="shortcut icon" href="https://raw.githubusercontent.com/Acidgorgon/current/main/docs/public/letter.png" type="img/png"/>
+      <meta property="og:description" content="A faster Roblox networking IDL compiler with two-way events, forked from Blink." />
     </>
   )
 }

@@ -2,8 +2,8 @@ import { Callout } from 'nextra/components'
 
 # Types
 
-This section contains a deep dive explanation on all types supported by Blink.<br/>
-If anything is missing or wrong, consider [submitting an issue](https://github.com/1Axen/blink/issues) under the GitHub repo.
+This section contains a deep dive explanation on all types supported by Current.<br/>
+If anything is missing or wrong, consider [submitting an issue](https://github.com/Acidgorgon/current/issues) under the GitHub repo.
 
 ## Ranges
 Ranges can be used with various types like: [Numbers](#numbers), [Strings](#strings), [Arrays](#arrays) etc. 
@@ -30,7 +30,7 @@ An exact range has only one value, such as `0` or `100`.
 |`100`|`100`|`100`|
 
 ## Numbers
-Blink has support for all buffer implemented number types, signed integers, unsigned integers, floating points, and more.
+Current has support for all buffer implemented number types, signed integers, unsigned integers, floating points, and more.
 
 Number types start with a prefix like: `u`, `i` or `f`, and are followed by the number of bits used to represent the number.
 The number of bits also corresponds to the cost of sending a particular number type over the network.
@@ -89,7 +89,7 @@ type UserId = f64
 ```
 
 ## Strings
-Strings are Luau's text container, in blink a string can be defined using the `string` type.
+Strings are Luau's text container, in Current a string can be defined using the `string` type.
 
 ### Bounding Strings
 The length of strings can be bounded by placing [a range](#ranges) within parenthesis after the type.<br/>
@@ -118,7 +118,7 @@ type Success = boolean
 
 ## Buffers
 Buffers can be defined using the `buffer` type.<br/>
-Buffers allow you to pass your own custom serialized data while still taking advantage of blink's batching.
+Buffers allow you to pass your own custom serialized data while still taking advantage of Current's batching.
 
 ### Bounding Buffers
 The length of buffers can be bounded by placing [a range](#ranges) within parenthesis after the type.<br/>
@@ -226,7 +226,7 @@ set Flags = {
 ```
 
 ## Enums
-Blink supports two types of enums, unit and tagged enums.
+Current supports two types of enums, unit and tagged enums.
 
 ### Unit Enums
 Units enums represent a set of possible values.<br/>
@@ -259,7 +259,7 @@ enum MouseEvent = "Type" {
 ```
 
 Tagged enums are a very powerful way to represent many different types of data.<br/>
-While not supported by blink, a union type can be substituted using tagged enums:
+While not supported by Current, a union type can be substituted using tagged enums:
 ``` ts copy
 enum Union = "Type" {
     Number {
@@ -349,11 +349,11 @@ type EntitiesFragment = Fragment<Entity[]>
 The `unknown` type represents values which cannot be known until runtime.<br/>
 For unions, use [tagged enums](#tagged-enums) instead.
 <Callout type="info">
-    Unknowns should be used sparingly as they utilize Roblox's serialization format thus negating most of the benefits of Blink.
+    Unknowns should be used sparingly as they utilize Roblox's serialization format thus negating most of the benefits of Current.
 </Callout>
 
 ## Instances
-Blink supports Roblox instances. They can be defined using the `Instance` type.
+Current supports Roblox instances. They can be defined using the `Instance` type.
 ```blink copy
 type AnInstance = Instance
 ```
@@ -394,15 +394,15 @@ type MyCFrame = CFrame<i16, f16>
 </Callout>
 
 ## Other Roblox Types
-Blink also supports a handful of other Roblox types like:
+Current also supports a handful of other Roblox types like:
     * `BrickColor`
     * `Color3`
     * `DateTime`
     * `DateTimeMillis`
 
 ## Exports
-Blink supports exporting write and read functions for a specific type.<br/>
-Exports can be a powerful way to leverage your blink types in various use-cases like: automatic ECS replication.<br/>
+Current supports exporting write and read functions for a specific type.<br/>
+Exports can be a powerful way to leverage your schema types in various use-cases like: automatic ECS replication.<br/>
 An export can be defined by prefixing the `export` keyword to a type's definition, for example:
 ```blink copy
 export struct MyInterface = {

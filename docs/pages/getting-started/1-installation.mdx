@@ -1,23 +1,29 @@
 import { Callout, Steps } from 'nextra/components'
 
 # Installation
-The recommended way to install blink is using [Rokit](https://github.com/rojo-rbx/rokit).
+The recommended way to install Current is using [Rokit](https://github.com/rojo-rbx/rokit).
 <Steps>
 
-### Installing Blink
+### Installing Current
 
 Open a terminal in your project directory and run the following command:
 
 ```sh copy filename="Bash"
-rokit add 1Axen/blink
+rokit add Acidgorgon/current
 ```
 
-### Updating Blink
+Or add this line under `[tools]` in your `rokit.toml`:
 
-When a new version of blink releases, using Rokit you can easily update using the following command:
+```toml copy filename="rokit.toml"
+current = "Acidgorgon/current@0.1.0"
+```
+
+### Updating Current
+
+When a new version of Current releases, using Rokit you can easily update using the following command:
 
 ```sh copy filename="Bash"
-rokit update 1Axen/blink
+rokit update Acidgorgon/current
 ```
 
 </Steps>
@@ -28,25 +34,13 @@ rokit update 1Axen/blink
 <summary>GitHub Releases</summary>
 
 You can download pre-built binaries directly from the
-[GitHub Releases](https://github.com/1Axen/blink/releases) page.
-
-</details>
-
-<details>
-<summary>pesde (0.18.5+)</summary>
-
-An official release is available on pesde starting from version 0.18.5.  
-To install blink using pesde, open a terminal in your project directory and run the following commands:
-```sh copy filename="Bash"
-pesde add --dev 1axen/blink
-pesde install
-```
+[GitHub Releases](https://github.com/Acidgorgon/current/releases) page.
+Extract the archive for your platform and put the `current` executable (`current.exe` on Windows) on your `PATH`.
 
 </details>
 
 <details>
 <summary>Roblox Studio</summary>
-Blink offers a companion studio plugin which allows you to write and generate files within Studio without the need for external tooling.  
-The studio plugin can be installed from the [Creator Store](https://create.roblox.com/store/asset/77231976488966/Blink-Editor).  
-Alternatively you can download it from [Github Releases](https://github.com/1Axen/Blink/releases).
+Current offers a companion studio plugin which allows you to write and generate files within Studio without the need for external tooling.  
+Download `current-plugin.rbxm` from [GitHub Releases](https://github.com/Acidgorgon/current/releases) and put it in your Studio plugins folder.
 </details>

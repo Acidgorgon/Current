@@ -1903,7 +1903,7 @@ end
 --> rather than templated because the index width depends on the schema.
 local function GenerateServerReceive(): { string }
 	return {
-		"--> Decodes and dispatches every event of the packet. Runs under xpcall in Receive.\n",
+		"--> Decodes and dispatches every event of the packet. Runs under the connection's xpcall.\n",
 		"local function Dispatch(Player: Player, Handlers: {[number]: (Player) -> ()}, Size: number): (InvalidPacketReason?, string?)\n",
 		"\twhile RecieveCursor < Size do\n",
 		`\t\tlocal Index = buffer.read{IndexType}(RecieveBuffer, RecieveCursor)\n`,
@@ -1925,30 +1925,31 @@ local function GenerateServerReceive(): { string }
 		"\treturn nil, nil\n",
 		"end\n",
 		"\n",
-		"--> One protected call per packet. A decode error drops the rest of the packet and reports it;\n",
-		"--> a Sync listener's error is reported like any script error and the packet carries on.\n",
-		"local function Receive(Player: Player, Handlers: {[number]: (Player) -> ()}, Budget: {number})\n",
+		"--> Each packet is decoded under one xpcall, made in its OnServerEvent connection. Recover handles\n",
+		"--> the rest when that call failed or Dispatch returned a reason: a decode error drops the rest of\n",
+		"--> the packet and reports it; a Sync listener's error is reported like any script error and the\n",
+		"--> packet carries on with a new xpcall.\n",
+		"local function Recover(Player: Player, Handlers: {[number]: (Player) -> ()}, Success: boolean, Result: any, Detail: any)\n",
 		"\tlocal Size = buffer.len(RecieveBuffer)\n",
 		"\twhile true do\n",
-		"\t\tlocal Success, Result, Detail = xpcall(Dispatch, Traceback, Player, Handlers, Size)\n",
 		"\t\tif Success then\n",
 		"\t\t\tif Result ~= nil then\n",
-		"\t\t\t\tInvalid(Player, Result :: any, Detail :: string)\n",
+		"\t\t\t\tInvalid(Player, Result, Detail)\n",
 		"\t\t\tend\n",
-		"\t\t\tbreak\n",
+		"\t\t\treturn\n",
 		"\t\telseif ListenerRunning then\n",
 		"\t\t\tListenerRunning = false\n",
 		"\t\t\ttask.spawn(error, Result, 0)\n",
 		"\t\telse\n",
 		"\t\t\tif type(Result) == \"table\" then\n",
-		"\t\t\t\tInvalid(Player, Result[1] :: any, Result[2] :: any)\n",
+		"\t\t\t\tInvalid(Player, Result[1], Result[2])\n",
 		"\t\t\telse\n",
 		"\t\t\t\tInvalid(Player, \"Malformed\", tostring(Result))\n",
 		"\t\t\tend\n",
-		"\t\t\tbreak\n",
+		"\t\t\treturn\n",
 		"\t\tend\n",
+		"\t\tSuccess, Result, Detail = xpcall(Dispatch, Traceback, Player, Handlers, Size)\n",
 		"\tend\n",
-		"\tBudget[2] -= math.max(EventCount, 1)\n",
 		"end\n",
 		"\n",
 		"--> Answers a client's function call with an error (over its Rate, or the queue is full)\n",
@@ -2133,7 +2134,12 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 			if Validate then
 				table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[#EVENT_SYNC_VALIDATION]}`)
 			end
-			table.insert(Connections, `\tReceive(Player, {Channel}Handlers, Budget)\n`)
+			table.insert(Connections, `\tlocal Success, Result, Detail = xpcall(Dispatch, Traceback, Player, {Channel}Handlers, buffer.len(Buffer))\n`)
+			table.insert(Connections, `\tif not Success or Result ~= nil then\n`)
+			table.insert(Connections, `\t\tRecover(Player, {Channel}Handlers, Success, Result, Detail)\n`)
+			table.insert(Connections, `\tend\n`)
+			--> Every packet costs at least one event token, so empty packets cannot flood for free
+			table.insert(Connections, `\tBudget[2] -= math.max(EventCount, 1)\n`)
 			if Validate then
 				table.insert(Connections, `\tSerdesThread = nil\n`)
 			end

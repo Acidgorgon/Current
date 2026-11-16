@@ -79,7 +79,7 @@ end
 --> SECURITY. Everything a client sends is hostile: an exploiter can call FireServer with any arguments,
 --> any bytes and any instance list, as often as it likes. Every packet goes through Admit
 --> (argument types, size caps, per-player byte and event budgets) before any of it is read,
---> then is decoded under one xpcall per packet (Receive), so a malformed packet is dropped and
+--> then is decoded under one xpcall per packet (see Recover), so a malformed packet is dropped and
 --> reported instead of throwing into the engine. Limits are the MAX_* and *_PER_SECOND constants.
 export type InvalidPacketReason =
     "InvalidArguments" --> the remote was called with something other than (buffer, {Instance}?)
@@ -97,7 +97,7 @@ local Budgets: {[Player]: {number}} = setmetatable({} :: any, { __mode = "k" })
 local CurrentBudget: {number} = {}
 local EventCount = 0
 local EventLimit = 0
---> True while a Sync listener runs inside Receive's xpcall: its errors are the game's, not the packet's
+--> True while a Sync listener runs inside the packet's xpcall: its errors are the game's, not the packet's
 local ListenerRunning = false
 local NoInstances = table.freeze({})
 local InvalidHandler: ((Player: Player, Reason: InvalidPacketReason, Detail: string) -> ())? = nil
@@ -132,9 +132,9 @@ local function Invalid(Player: Player, Reason: InvalidPacketReason, Detail: stri
     warn(`[Current]: Dropped a packet from {Player.Name} ({Player.UserId}): {Reason}: {Detail}{Suppressed}`)
 end
 
---> Checks a packet before any of it is read. Returns the player's budget, or nil to drop it.
-local function Admit(Player: Player, Buffer: any, Instances: any): {number}?
-    ListenerRunning = false
+--> Admit's slow path: a player's first packet, wrong argument types, or a packet over a limit.
+--> Same checks as Admit, in order, and reports the first one that fails.
+local function Screen(Player: Player, Buffer: any, Instances: any): {number}?
     local Now = os.clock()
     local Budget = Budgets[Player]
     if Budget == nil then
@@ -176,6 +176,36 @@ local function Admit(Player: Player, Buffer: any, Instances: any): {number}?
     end
     Budget[1] = Bytes - Cost
 
+    EventCount = 0
+    EventLimit = math.min(Events, MAX_EVENTS_PER_PACKET)
+    CurrentBudget = Budget
+    return Budget
+end
+
+--> Checks a packet before any of it is read. Returns the player's budget, or nil to drop it.
+--> The common case (a known player, the right types, within every limit) changes nothing
+--> until it has passed every check; anything else goes to Screen, which repeats them and reports.
+local function Admit(Player: Player, Buffer: any, Instances: any): {number}?
+    ListenerRunning = false
+    local Budget = Budgets[Player]
+    if Budget == nil or type(Buffer) ~= "buffer" or (Instances ~= nil and type(Instances) ~= "table") then
+        return Screen(Player, Buffer, Instances)
+    end
+
+    local Size = buffer.len(Buffer)
+    local InstanceCount = if Instances then #Instances else 0
+    local Now = os.clock()
+    local Elapsed = Now - Budget[3]
+    local Bytes = math.min(BYTES_BURST, Budget[1] + Elapsed * BYTES_PER_SECOND)
+    local Events = math.min(EVENTS_BURST, Budget[2] + Elapsed * EVENTS_PER_SECOND)
+    local Cost = Size + InstanceCount * INSTANCE_BYTES
+    if Size > MAX_PACKET_BYTES or InstanceCount > MAX_PACKET_INSTANCES or Cost > Bytes or Events < 1 then
+        return Screen(Player, Buffer, Instances)
+    end
+
+    Budget[1] = Bytes - Cost
+    Budget[2] = Events
+    Budget[3] = Now
     EventCount = 0
     EventLimit = math.min(Events, MAX_EVENTS_PER_PACKET)
     CurrentBudget = Budget

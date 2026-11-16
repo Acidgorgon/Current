@@ -1,13 +1,4 @@
-/.DS_Store
 /node_modules
-/temp
-/out
-/.next
-/.env
-
-/**/.DS_Store
-/**/node_modules
-/**/temp
-/**/out
-/**/.next
-/**/.env
+/.vitepress/cache
+/.vitepress/dist
+.DS_Store

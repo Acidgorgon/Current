@@ -69,10 +69,11 @@ When set to `true` automatic replication will be disabled and a `StepReplication
 ## `ReuseSendBuffers`
 Default: `false`
 
-When `true`, each writer keeps the exact-size buffer it last handed to a remote and reuses it when the next
-send has the same size, instead of allocating a new one. This removes almost all per-frame garbage from steady
-traffic (for example a fixed-size match state broadcast every frame). It relies on Roblox copying a buffer's
-contents when a remote is fired, which is how remotes serialize their arguments.
+When `true`, outgoing packets are copied into a pool that keeps one exact-size buffer per packet size
+(up to 64 KB of buffers in total), instead of a new buffer per remote call. Every send of a given size reuses
+the same buffer, so steady traffic (a fixed-size match state broadcast, per-player packets whose sizes repeat
+from frame to frame) creates almost no garbage. It relies on Roblox copying a buffer's contents when a remote
+is fired, which is how remotes serialize their arguments.
 
 ## `RemoteScope`
 Default: `""`

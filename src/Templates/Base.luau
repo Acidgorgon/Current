@@ -37,8 +37,6 @@ type Writer = {
     Cursor: number,
     Buffer: buffer,
     Instances: {any},
-    --> Cached exact-size outgoing buffer (only reused when ReuseSendBuffers is on)
-    Out: buffer?,
     --> Server only: how many bytes/instances of the broadcast log this writer already holds
     Synced: number,
     SyncedInstances: number,
@@ -50,7 +48,6 @@ local function NewWriter(): Writer
         Cursor = 0,
         Buffer = buffer.create(64),
         Instances = {},
-        Out = nil,
         Synced = 0,
         SyncedInstances = 0,
     }
@@ -122,21 +119,33 @@ local function Allocate(Bytes: number)
     return Offset
 end
 
+--> ReuseSendBuffers: one outgoing buffer per size, shared by every send of that size
+--> (remotes copy their arguments when fired), up to OUT_POOL_LIMIT bytes in total.
+local OUT_POOL_LIMIT = 65536
+local OutPool: {[number]: buffer} = {}
+local OutPoolBytes = 0
+
 --> Exact-size copy of a saved writer's contents, ready to hand to a remote.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local Pack
 Pack = function(Writer: Writer): buffer
     local Cursor = Writer.Cursor
-    local Out = Writer.Out
-    if Out == nil or buffer.len(Out) ~= Cursor then
-        Out = buffer.create(Cursor)
-        if REUSE_SEND_BUFFERS then
-            Writer.Out = Out
+    local Out: buffer
+    if REUSE_SEND_BUFFERS then
+        Out = OutPool[Cursor]
+        if Out == nil then
+            Out = buffer.create(Cursor)
+            if OutPoolBytes + Cursor <= OUT_POOL_LIMIT then
+                OutPool[Cursor] = Out
+                OutPoolBytes += Cursor
+            end
         end
+    else
+        Out = buffer.create(Cursor)
     end
 
-    buffer.copy(Out :: buffer, 0, Writer.Buffer, 0, Cursor)
-    return Out :: buffer
+    buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
+    return Out
 end
 
 --> Unreliable sends, FireList and exports serialize into the Scratch writer.

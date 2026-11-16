@@ -260,19 +260,18 @@ Types.f16 = {
 			:Branch("Conditional", Value, "0", "Equals")
 			:Line(`buffer.writeu16({SEND_BUFFER}, {Allocation}, 0)`)
 			:Branch("Default")
-			:Line(`local float = {Value}`)
 			:Lines({
-				"local Abosulte = math.abs(float)\n",
-				"local Interval = math.ldexp(1, math.floor(math.log(Abosulte, 2)) - 10)\n",
-				"local RoundedValue = (Abosulte // Interval) * Interval\n",
-				"local Fraction, Exponent = math.frexp(RoundedValue)\n",
-				"Exponent += 14\n",
-				"local Mantissa = math.round(if Exponent <= 0\n",
-				"	then Fraction * 0x400 / math.ldexp(1, math.abs(Exponent))\n",
-				"	else Fraction * 0x800) % 0x400\n",
-				"local Result = Mantissa\n",
-				"	+ math.max(Exponent, 0) * 0x400\n",
-				"	+ if float < 0 then 0x8000 else 0\n",
+				--> Same bits as the reference encoder (truncating), without math.log
+				`local Absolute = math.abs({Value})\n`,
+				"local _, Exponent = math.frexp(Absolute)\n",
+				"local Biased = Exponent + 14\n",
+				"local Result\n",
+				"if Biased > 0 then\n",
+				"	Result = math.floor(math.ldexp(Absolute, 11 - Exponent)) % 0x400 + Biased * 0x400\n",
+				"else\n",
+				"	Result = math.round(math.ldexp(math.floor(math.ldexp(Absolute, 11 - Exponent)), Exponent + 13)) % 0x400\n",
+				"end\n",
+				`if {Value} < 0 then Result += 0x8000 end\n`,
 			}, Block.Indent + 1)
 			:Line(`buffer.writeu16({SEND_BUFFER}, {Allocation}, Result)`)
 			:End()

@@ -20,9 +20,6 @@ export default defineConfig({
     languages: [{ ...blinkGrammar, name: 'blink', aliases: ['current'] }],
   },
 
-  // The security guide is written separately and merged later
-  ignoreDeadLinks: [/(^|\/)security$/],
-
   themeConfig: {
     ...shared.themeConfig,
 

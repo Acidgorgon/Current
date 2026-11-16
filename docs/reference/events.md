@@ -19,6 +19,7 @@ event Damage {
 | [`Poll`](#polling) | `true`, `false` | no |
 | [`ReuseTables`](#reusetables) | `true`, `false` | no |
 | [`Data`](#data) | any type, or a type pack `(A, B, …)` | no |
+| [`Rate`](#rate) | a positive number | no |
 
 ## `From`
 
@@ -120,6 +121,22 @@ event Hit {
 ```
 
 A type pack becomes separate arguments in Luau: `Net.Hit.Fire(TargetId, Position, Damage)`.
+
+## `Rate`
+
+A per-player limit in calls per second for this event, enforced on the server. Burst is max(`Rate`, 1). Over it, the event is dropped and reported as `RateLimited` (see [Security](/guide/security#per-event-rates)). It only applies to what clients send (`From: Client` or `From: Both`).
+
+```blink
+event PlaceBlock {
+    From: Client,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: vector,
+    Rate: 10
+}
+```
+
+This field is Current only; upstream Blink rejects it.
 
 ## Using events in Luau
 

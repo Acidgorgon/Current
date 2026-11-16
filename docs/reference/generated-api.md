@@ -59,6 +59,33 @@ end
 |---|---|
 | `On(Handler: (Player, …) -> (…))` | set the handler; its return values go back to the client |
 
+### Invalid packets
+
+| Function | Use |
+|---|---|
+| `SetInvalidPacketHandler(handler?)` | `handler: (Player, InvalidPacketReason, Detail: string) -> ()` is called (on its own thread) for every packet the server drops; `nil` restores the default, a warning at most once per player every 10 seconds |
+
+The module exports the reason as a type, `Net.InvalidPacketReason`:
+
+```lua
+export type InvalidPacketReason =
+    "InvalidArguments"   -- the remote was called with something other than (buffer, {Instance}?)
+    | "TooLarge"         -- over MaxPacketBytes or MaxPacketInstances
+    | "TooManyEvents"    -- over MaxEventsPerPacket
+    | "RateLimited"      -- over the bytes or events per second, or an event's own Rate
+    | "UnknownEvent"     -- an event index the server does not listen to
+    | "Malformed"        -- the packet did not decode
+    | "TooManyInvocations" -- more than 256 function calls waiting for an answer
+```
+
+```lua
+Net.SetInvalidPacketHandler(function(Player: Player, Reason: Net.InvalidPacketReason, Detail: string)
+    print(Player.Name, Reason, Detail)
+end)
+```
+
+See [Security](/guide/security#the-invalid-packet-handler) for what each reason means. The client module has no such function: the client trusts the server.
+
 ## Client module
 
 ### Events the client fires
@@ -109,7 +136,7 @@ Both modules expose `StepReplication()`.
 - **Two copies.** Two modules with the same [`RemoteScope`](./options#remotescope) in one game is an error, to stop them stealing each other's packets.
 - **Queued events.** Reliable events and function requests that arrive before a listener exists are queued until one connects (warning after 256).
 - **Players who left.** Reliable sends to a player after `PlayerRemoving` are dropped.
-- **Malformed data.** If client data fails validation, reading stops with an error and the rest of that packet is dropped; no listener sees the bad value.
+- **Malformed data.** If client data fails validation, the rest of that packet is dropped and reported to the [invalid packet handler](#invalid-packets); nothing is thrown, and no listener sees the bad value. Packets over the [limits](./options#limits) are dropped the same way. See [Security](/guide/security).
 
 ## TypeScript
 
@@ -126,4 +153,4 @@ export declare const Ping: {
 }
 ```
 
-Polling events declare `Iter: () => IterableFunction<…>`, and functions declare `On` (server) or `Invoke` (client).
+Polling events declare `Iter: () => IterableFunction<…>`, and functions declare `On` (server) or `Invoke` (client). The server declarations also export `InvalidPacketReason` and `SetInvalidPacketHandler`.

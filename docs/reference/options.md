@@ -8,7 +8,7 @@ option ServerOutput = "../src/shared/net/server.luau"
 option ClientOutput = "../src/shared/net/client.luau"
 ```
 
-Strings are in double quotes, booleans are `true` or `false`, and `Casing` takes a bare name. An unknown option name is an error.
+Strings are in double quotes, booleans are `true` or `false`, numbers are written bare, as whole numbers, and `Casing` takes a bare name. An unknown option name is an error.
 
 | Option | Type | Default |
 |---|---|---|
@@ -27,6 +27,15 @@ Strings are in double quotes, booleans are `true` or `false`, and `Casing` takes
 | [`ReuseReceiveTables`](#reusereceivetables) | boolean | `false` |
 | [`RemoteScope`](#remotescope) | string | `""` |
 | [`UseColon`](#usecolon) | boolean | `false` |
+| [`ShuffleEventIds`](#shuffleeventids) | boolean | `true` |
+| [`EventIdSeed`](#eventidseed) | string | `""` |
+| [`ValidateFloats`](#validatefloats) | boolean | `true` |
+| [`ValidateStrings`](#validatestrings) | boolean | `true` |
+| [`MaxPacketBytes`](#limits) | number | `16384` |
+| [`MaxPacketInstances`](#limits) | number | `256` |
+| [`MaxEventsPerPacket`](#limits) | number | `256` |
+| [`MaxBytesPerSecond`](#limits) | number | `65536` |
+| [`MaxEventsPerSecond`](#limits) | number | `1024` |
 
 ## `ServerOutput`, `ClientOutput`, `TypesOutput`
 
@@ -54,9 +63,9 @@ The casing of the generated method names.
 
 | Casing | Methods |
 |---|---|
-| `Pascal` | `Fire`, `FireAll`, `FireList`, `FireExcept`, `On`, `Iter`, `Invoke`, `StepReplication`, `Read`, `Write` |
-| `Camel` | `fire`, `fireAll`, `fireList`, `fireExcept`, `on`, `iter`, `invoke`, `stepReplication`, `read`, `write` |
-| `Snake` | `fire`, `fire_all`, `fire_list`, `fire_except`, `on`, `iter`, `invoke`, `step_replication`, `read`, `write` |
+| `Pascal` | `Fire`, `FireAll`, `FireList`, `FireExcept`, `On`, `Iter`, `Invoke`, `StepReplication`, `SetInvalidPacketHandler`, `Read`, `Write` |
+| `Camel` | `fire`, `fireAll`, `fireList`, `fireExcept`, `on`, `iter`, `invoke`, `stepReplication`, `setInvalidPacketHandler`, `read`, `write` |
+| `Snake` | `fire`, `fire_all`, `fire_list`, `fire_except`, `on`, `iter`, `invoke`, `step_replication`, `set_invalid_packet_handler`, `read`, `write` |
 
 ```blink
 option Casing = Camel
@@ -173,3 +182,38 @@ Current's remotes and its `_G._CURRENT` registry have different names from Blink
 ## `UseColon`
 
 Accepted for compatibility with older Blink schemas. It has no effect on the generated code.
+
+## `ShuffleEventIds`
+
+Default `true`. Event indexes on the wire are a deterministic permutation per channel, seeded by a hash of the schema (whitespace and comments don't affect it). Client and server built from the same schema always agree. This is obscurity, not security; see [Security](../guide/security#shuffled-event-indexes). `false` uses declaration order.
+
+```blink
+option ShuffleEventIds = false
+```
+
+## `EventIdSeed`
+
+Default `""`. Mixed into the shuffle seed. Change it to reshuffle indexes without changing the schema.
+
+```blink
+option EventIdSeed = "season-4"
+```
+
+## `ValidateFloats`
+
+Default `true`. The server rejects NaN and ±infinity in client data (`f16`/`f32`/`f64`, `vector`, `CFrame`, `DateTime`). Floats with a finite range are already checked by the range. `false` lets them through. The client never pays for this.
+
+## `ValidateStrings`
+
+Default `true`. The server rejects client strings that aren't valid UTF-8. `false` skips the check (for example, for strings used as raw bytes).
+
+## `MaxPacketBytes`, `MaxPacketInstances`, `MaxEventsPerPacket`, `MaxBytesPerSecond`, `MaxEventsPerSecond` {#limits}
+
+Defaults `16384`, `256`, `256`, `65536` and `1024`. Per-player limits on what a client may send; see [Security](../guide/security#limits). Whole numbers; `0` turns a limit off. Each instance reference counts as 8 bytes against `MaxBytesPerSecond`. Each bucket's burst is one second of its rate, but never less than one packet at the packet limit.
+
+```blink
+option MaxPacketBytes = 32768
+option MaxEventsPerSecond = 2048
+```
+
+These options are Current only; upstream Blink rejects them.

@@ -7,7 +7,7 @@ local fs = require("@lune/fs")
 
 ---- Settings ----
 
-local EXTENSIONS = { "", ".txt", ".blink" }
+local EXTENSIONS = { "", ".txt", ".blink", ".current" }
 
 return function(Path: string): string
 	local Directory, Filename = PathParser.Components(Path)

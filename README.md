@@ -20,7 +20,7 @@ What Current adds on top of Blink:
   }
   ```
 
-  Data sent by clients is validated on the server exactly like a `From: Client` event. See [Events](./docs/pages/language/5-events.mdx).
+  Data sent by clients is validated on the server exactly like a `From: Client` event. See [Two-way events](https://acidgorgon.github.io/Current/guide/two-way-events).
 - **Faster generated code.** In the benchmark harness Current is the fastest of the nine serializing libraries tested in every scenario, and 2.5x faster than upstream Blink 0.18.9 on a 44-player match snapshot and 3.1x on 120 events per frame. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
 
 # Install
@@ -64,7 +64,9 @@ Current does two things to combat bad actors:
 2. As a result of the compression done by Current it becomes **significantly harder** to snoop on your game's network traffic. Long gone are the days of skids using RemoteSpy to snoop on your game's traffic.
 
 # Get Started
-The documentation lives in [docs/pages](./docs/pages): start with [installation](./docs/pages/getting-started/1-installation.mdx), then the [introduction](./docs/pages/getting-started/2-introduction.mdx) and the [language reference](./docs/pages/language/1-options.mdx).
+Read the documentation at **https://acidgorgon.github.io/Current/**: start with [installation](https://acidgorgon.github.io/Current/guide/installation), then [getting started](https://acidgorgon.github.io/Current/guide/getting-started) and the [schema language reference](https://acidgorgon.github.io/Current/reference/schema). Coming from Blink? See [Migrating from Blink](https://acidgorgon.github.io/Current/guide/migrating-from-blink).
+
+The site's source is in [docs/](./docs) (VitePress): `cd docs && npm ci && npm run docs:dev`.
 
 # Credits
 Current is a fork of [Blink](https://github.com/1Axen/blink) by [1Axen](https://github.com/1Axen), under the MIT license (see [LICENSE](LICENSE)). The compiler, schema language, Studio plugin and documentation all come from Blink.

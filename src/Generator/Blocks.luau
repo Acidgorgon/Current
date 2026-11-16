@@ -35,6 +35,7 @@ export type Block = typeof(setmetatable(
 		Operation: Operation,
 		Variables: { [string]: boolean },
 		OperationOffset: number,
+		Shared: boolean?,
 	},
 	Block
 ))
@@ -231,6 +232,17 @@ function Block.Iterator(self: Block, Key: string, Value: string, Iterator: strin
 	return Block.new(self)
 end
 
+--> A do ... end scope for locals. It reads with its parent (offsets continue the parent's
+--> block), so the wire layout is the same as without it.
+function Block.Scope(self: Block): Block
+	self:Line("do")
+	local Scope = Block.new(self, self.Unique)
+	Scope.Operation = self.Operation
+	Scope.Unsafe = self.Unsafe
+	Scope.Shared = true
+	return Scope
+end
+
 function Block.Compare(self: Block, Left: string, Right: string, Operator: EqualityOperator): Block
 	self:Line(`if {Left} {Operators[Operator]} {Right} then`)
 	return Block.new(self)
@@ -266,6 +278,14 @@ function Block.Return(self: Block, Return: string): Block
 end
 
 function Block.End(self: Block): Block
+	if self.Shared then
+		--> A Scope: its reads were counted in the parent's block
+		local Parent = self.Parent :: Block
+		Parent:Lines(self.Content)
+		Parent:Line("end")
+		return Parent
+	end
+
 	self:_appendOperations()
 
 	local Operation = self.Operation

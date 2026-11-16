@@ -123,6 +123,7 @@ local function NewSpareList(): string
 	return Slot
 end
 
+
 --> Fire method factories, emitted only when used. Each takes an event's serializer and
 --> returns the method, so every event shares these few prototypes. The "1" variants
 --> skip vararg forwarding for single-value events on the hot reliable paths.
@@ -299,6 +300,25 @@ local function IsTableType(Declaration: Type): boolean
 		return IsTableType((Declaration :: Parser.Optional).Value.Of)
 	end
 	return Kind == "Struct" or Kind == "Array" or Kind == "Map" or Kind == "Set" or Kind == "TagEnum"
+end
+
+--> A struct whose fields hold no nested struct, array, map or tagged enum, and few enough of
+--> them to keep in registers
+local function IsFlatStruct(Declaration: Parser.Struct): boolean
+	local Fields = Declaration.Value.Values
+	if #Fields == 0 or #Fields > 32 then
+		return false
+	end
+	for _, Field in Fields do
+		local Of = Field :: Type
+		if Of.Type == "Optional" then
+			Of = (Of :: Parser.Optional).Value.Of
+		end
+		if Of.Type ~= "Primitive" and Of.Type ~= "Enum" and Of.Type ~= "Set" then
+			return false
+		end
+	end
+	return true
 end
 
 --> Whether a decoded value of this type can be nil (array items of such types can leave holes)
@@ -569,6 +589,28 @@ function Declarations.Struct(
 	TagKey: string?
 )
 	local Value = Declaration.Value
+
+	--> A struct of plain fields is read into locals and built by one constructor holding the
+	--> values (no placeholder writes). The reads are generated apart from the writes, which use
+	--> the struct's fields.
+	if Source == nil and TagKey == nil and IsFlatStruct(Declaration) then
+		Read:Declare(Variable, true)
+		local Scope = Read:Scope()
+		local Entries = {}
+		for Index, Field in Value.Values do
+			local Name = Field.Name
+			local Local = if IsValidIdentifier(Name) then `Field_{Name}` else `Field_{Index}`
+			Generators.UserType(Field :: Type, Scope, Blocks.Block(), Local)
+			table.insert(Entries, `{FormatKey(Name)} = {Local}`)
+		end
+		Scope:Line(`{Variable} = \{{table.concat(Entries, ", ")}\} :: any`)
+		Scope:End()
+
+		for _, Field in Value.Values do
+			Generators.UserType(Field :: Type, Blocks.Block(), Write, `{Variable}{FormatIndex(Field.Name)}`)
+		end
+		return
+	end
 
 	--> Constant-valued constructor compiles to DUPTABLE: one allocation, keys pre-sized.
 	--> Every placeholder is overwritten by the field reads below (a tagged enum variant's

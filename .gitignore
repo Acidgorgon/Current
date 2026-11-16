@@ -1,0 +1,26 @@
+# Project place file
+/src.rbxlx
+
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
+
+/release
+/Network
+/Blink
+test/Sources/Game.txt
+sourcemap.json
+/plugin/bundle
+
+/benchmark/tools
+/benchmark/packages
+/benchmark/config.json
+/benchmark/src/shared/blink
+/benchmark/src/shared/zap
+/benchmark/roblox
+
+/site
+
+*.rbxl
+*.rbxl.lock
+test/Sources/Issue.blink

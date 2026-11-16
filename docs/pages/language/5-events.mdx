@@ -52,6 +52,21 @@ Determines the listening API exposed on the receiving side.
     Yielding or erroring in sync event can cause <b>undefined and sometimes game-breaking behaviour</b>.
 </Callout>
 
+#### `ReuseTables`
+Optional, `true` or `false`. Overrides the [`ReuseReceiveTables`](./1-options#reusereceivetables) option for this
+event: with `true` the event decodes each value into the tables of its previous value instead of allocating new
+ones, with `false` every value gets new tables. Read the option's notes before turning it on: the table a listener
+receives is overwritten by the event's next value. `Polling` events ignore it.
+```blink copy
+event MatchState {
+    From: Server,
+    Type: Unreliable,
+    Call: SingleSync,
+    ReuseTables: true,
+    Data: MatchSnapshot
+}
+```
+
 #### `Data`
 Determines the data that is sent through the event, can be any [type](./4-types.mdx).<br/>
 This field can be omitted if no data is required.

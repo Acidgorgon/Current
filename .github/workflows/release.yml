@@ -1,51 +1,82 @@
 name: Release
 
+# Two ways in:
+#  - publishing a release in the GitHub UI (or with `gh release create`) builds
+#    and uploads the assets to that release;
+#  - running this workflow by hand with a `release_tag` creates the release
+#    (and its tag, from main) first, then builds and uploads to it. This is for
+#    environments that cannot push git tags.
 on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag for the new release, e.g. v0.19.0 (created from main)"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
-  GH_TOKEN: ${{github.token}}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # A release created with the workflow's own token does not trigger the
+      # `release: published` event, so this path never runs the build twice.
+      - name: Create release
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists, uploading to it"
+          else
+            gh release create "$RELEASE_TAG" \
+              --target main \
+              --title "blink-plus $RELEASE_TAG" \
+              --notes "blink-plus $RELEASE_TAG. Install with rokit: \`rokit add Acidgorgon/blink-plus blink\`, or download the archive for your platform below. The executable is named \`blink\`, a drop-in replacement for upstream Blink's CLI."
+          fi
+
+      # Check out the release tag itself so the build matches what was tagged.
       - name: Checkout
         uses: actions/checkout@v4
-      
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Check version matches tag
+        run: |
+          version=$(jq -r '.rules[] | objects | select(.identifier == "VERSION") | .value' build/.darklua.json)
+          if [ "${RELEASE_TAG#v}" != "$version" ]; then
+            echo "::error::Release tag $RELEASE_TAG does not match build/.darklua.json VERSION $version"
+            exit 1
+          fi
+
       - name: Setup rokit
         uses: CompeyDev/setup-rokit@v0.1.0
-
-      - name: Setup pesde
-        uses: axiom-co/setup-pesde@v0.4.1
-        with:
-          token: ${{ secrets.PESDE_TOKEN }}
 
       - name: Build binaries
         run: lune run build
 
       - name: linux-aarch64
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-linux-aarch64.tar.xz
+        run: gh release upload "$RELEASE_TAG" release/blink-linux-aarch64.tar.xz --clobber
 
       - name: linux-x86_64
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-linux-x86_64.tar.xz
+        run: gh release upload "$RELEASE_TAG" release/blink-linux-x86_64.tar.xz --clobber
 
       - name: macos-aarch64
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-macos-aarch64.tar.xz
+        run: gh release upload "$RELEASE_TAG" release/blink-macos-aarch64.tar.xz --clobber
 
       - name: macos-x86_64
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-macos-x86_64.tar.xz
+        run: gh release upload "$RELEASE_TAG" release/blink-macos-x86_64.tar.xz --clobber
 
       - name: windows-x86_64
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-windows-x86_64.tar.gz
+        run: gh release upload "$RELEASE_TAG" release/blink-windows-x86_64.tar.gz --clobber
 
       - name: plugin
-        run: gh release upload ${{github.event.release.tag_name}} release/blink-plugin.rbxm
-      
-      - name: pesde
-        run: pesde publish -y
+        run: gh release upload "$RELEASE_TAG" release/blink-plugin.rbxm --clobber

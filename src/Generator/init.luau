@@ -387,7 +387,9 @@ function Declarations.Event(Declaration: Parser.Event)
 		UserTypes.PushLines(Write, 1, 0)
 	end
 
-	if CanListen then
+	--> Listened events read their data inline in the receive handler (one call less per event);
+	--> only polled events keep a separate read function.
+	if CanListen and IsPolling then
 		UserTypes.PushLines(Read, 1, 0)
 	end
 
@@ -429,19 +431,29 @@ function Declarations.Event(Declaration: Parser.Event)
 				CallListener = CallListener:Line(`SerdesEvent = "{Name}"`)
 			end
 
-			local PathExpr = IsSingle and Connection or "Listener"
+			local PathExpr = "Listener"
 			local CallExpr = IsSync and `{PathExpr}({ListenerArguments})` or `Spawn({PathExpr}, {ListenerArguments})`
 			CallListener = CallListener:Line(CallExpr)
 		end
 
 		--> Receive handler, dispatched by event index
 		local Handler = Blocks.Function(`{HandlersTable}[{Index}]`, PlayerParameter, nil, true)
-		Handler:Line(`local {Values} = {ReadEvent}`)
+		if Value.Data then
+			--> The read function's body without its header, return and end
+			assert(string.find(Read[#Read - 1], "^%s*return ") and string.find(Read[#Read], "^end"), "unexpected read body")
+			Handler:Lines(table.move(Read, 2, #Read - 2, 1, {}), 0)
+		else
+			Handler:Line("local Value = nil")
+		end
+
+		if IsSingle then
+			Handler:Line(`local Listener = {Connection}`)
+		end
 
 		if IsReliable then
 			local ListenerBound: Blocks.Block
 			if IsSingle then
-				ListenerBound = Handler:Compare(Connection, "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1)
+				ListenerBound = Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1)
 			else
 				Handler:Line(`local Listeners = {Connection}`)
 				ListenerBound = Handler:Compare(`#Listeners`, "0", "Greater")
@@ -455,7 +467,7 @@ function Declarations.Event(Declaration: Parser.Event)
 				:End()
 		else
 			if IsSingle then
-				Handler:Compare(Connection, "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1):End()
+				Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1):End()
 			else
 				Handler:Iterator("_", "Listener", Connection):Lines(CallListener.Content, Handler.Indent + 1):End()
 			end

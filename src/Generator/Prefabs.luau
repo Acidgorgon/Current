@@ -221,33 +221,25 @@ Types.f64, Primitives.f64 = GenerateNumberGenerator("f64", DOUBLE, Asserts.float
 
 Types.f16 = {
 	Read = function(Variable: string, Block: Block)
-		Types.u16.Read("Encoded", Block)
+		local Offset = Block:Read(HALF_FLOAT)
 		Block:Declare(Variable, true)
-		Block:Line(`local MantissaExponent = Encoded % 0x8000`)
-		Block:Compare("MantissaExponent", "0b0_11111_0000000000 ", "Equals")
-			:Compare("Encoded // 0x8000", "1", "Equals")
-			:Line(`{Variable} = -math.huge`)
-			:Branch("Default")
-			:Line(`{Variable} = math.huge`)
-			:End()
-			:Branch("Conditional", "MantissaExponent", "0b1_11111_0000000000  ", "Equals")
-			:Line(`{Variable} = 0 / 0`)
-			:Branch("Conditional", "MantissaExponent", "0b0_00000_0000000000  ", "Equals")
-			:Line(`{Variable} = 0`)
-			:Branch("Default")
-			:Lines({
-				"local Mantissa = MantissaExponent % 0x400\n",
-				"local Exponent = MantissaExponent // 0x400\n",
-				"local Fraction;\n",
-				"if Exponent == 0 then\n",
-				"	Fraction = Mantissa / 0x400\n",
-				"else\n",
-				"	Fraction = Mantissa / 0x800 + 0.5\n",
-				"end\n",
-				"local Result = math.ldexp(Fraction, Exponent - 14)\n",
-			}, Block.Indent + 1)
-			:Line(`{Variable} = if Encoded // 0x8000 == 1 then -Result else Result`)
-			:End()
+		--> Normal: (0x400 + mantissa) * 2^(exponent - 25), subnormal: mantissa * 2^-24.
+		--> In a do block so repeated f16 reads do not pile up registers.
+		Block:Line("do")
+		Block:Lines({
+			`local Encoded = buffer.readu16({RECIEVE_BUFFER}, {Offset})\n`,
+			"local Exponent = Encoded // 0x400 % 0x20\n",
+			"local Result = Encoded % 0x400\n",
+			"if Exponent == 0 then\n",
+			"	Result *= 0.000000059604644775390625\n",
+			"elseif Exponent == 0x1F then\n",
+			"	Result = if Result == 0 then math.huge else 0 / 0\n",
+			"else\n",
+			"	Result = math.ldexp(Result + 0x400, Exponent - 25)\n",
+			"end\n",
+			`{Variable} = if Encoded >= 0x8000 then -Result else Result\n`,
+		}, Block.Indent + 1)
+		Block:Line("end")
 	end,
 	Write = function(Value: string, Block: Block)
 		local Allocation = Block:Allocate(HALF_FLOAT)

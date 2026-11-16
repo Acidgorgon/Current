@@ -31,7 +31,7 @@ Upstream Blink's Studio benchmarks are [here](./benchmark/Benchmarks.md).
 
 ## blink-plus benchmarks
 
-`benchmark/harness/` compares blink-plus with upstream Blink, Zap, BlinkBlox and plain RemoteEvents (more libraries coming) on football-game traffic with 44 clients, measuring CPU (native and interpreted), exact allocations, module memory and wire bytes. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
+`benchmark/harness/` compares blink-plus with upstream Blink, BlinkBlox, Zap, ByteNet, QuickNet, Packet, Warp, Lync and plain RemoteEvents on football-game traffic with 44 clients, measuring CPU (native and interpreted), exact allocations, module memory and wire bytes. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
 
 # Security
 Blink does two things to combat bad actors:

@@ -37,6 +37,10 @@ features:
     linkText: Security
 ---
 
+::: tip Made with Claude
+Most of Current was written with [Claude](https://claude.ai), Anthropic's AI, to speed up my own Roblox workflow. Issues and pull requests are welcome.
+:::
+
 ## Install
 
 ::: code-group

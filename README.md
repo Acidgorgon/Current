@@ -7,6 +7,9 @@ A faster Roblox networking IDL compiler with two-way events, forked from [Blink]
 
 You describe your events, functions and types in a schema file, and Current generates typed server and client Luau modules (and optional TypeScript definitions) that batch everything into buffers. Current reads Blink's schema language, so existing `.blink` files compile unchanged.
 
+> [!NOTE]
+> **Made with Claude.** Most of Current was written with [Claude](https://claude.ai), Anthropic's AI, to speed up my own Roblox workflow. Issues and pull requests are welcome.
+
 What Current adds on top of Blink:
 
 - **Two-way events.** `From: Both` declares one event that the server and clients can both fire and both listen to, sharing one event index:

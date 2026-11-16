@@ -9,7 +9,6 @@ return [[local Invocations = 0
 --> last player sent to stays loaded until a send needs another one, so a run
 --> of Fire calls to one player pays for one switch instead of one per call.
 local SendSize = 64
-local SendOffset = 0
 local SendCursor = 0
 local SendBuffer = buffer.create(64)
 local SendInstances = {}
@@ -69,7 +68,6 @@ end
 local function Load(Writer: Writer)
     SendSize = Writer.Size
     SendCursor = Writer.Cursor
-    SendOffset = Writer.Cursor
     SendBuffer = Writer.Buffer
     SendInstances = Writer.Instances
 end
@@ -113,7 +111,6 @@ local function Allocate(Bytes: number)
         Grow(InUse)
     end
 
-    SendOffset = Offset
     SendCursor = InUse
 
     return Offset

@@ -122,30 +122,56 @@ local OUT_POOL_LIMIT = 65536
 local OutPool: {[number]: buffer} = {}
 local OutPoolBytes = 0
 
+--> New exact-size outgoing buffer
+local function NewOut(Size: number): buffer
+    if REUSE_SEND_BUFFERS then
+        local Out = OutPool[Size]
+        if Out == nil then
+            Out = buffer.create(Size)
+            if OutPoolBytes + Size <= OUT_POOL_LIMIT then
+                OutPool[Size] = Out
+                OutPoolBytes += Size
+            end
+        end
+        return Out
+    end
+    return buffer.create(Size)
+end
+
 --> Exact-size copy of a saved writer's contents, ready to hand to a remote.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local Pack
 Pack = function(Writer: Writer): buffer
     local Cursor = Writer.Cursor
-    local Out: buffer
-    if REUSE_SEND_BUFFERS then
-        Out = OutPool[Cursor]
-        if Out == nil then
-            Out = buffer.create(Cursor)
-            if OutPoolBytes + Cursor <= OUT_POOL_LIMIT then
-                OutPool[Cursor] = Out
-                OutPoolBytes += Cursor
-            end
-        end
-    else
-        Out = buffer.create(Cursor)
-    end
-
+    local Out = NewOut(Cursor)
     buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
     return Out
 end
 
---> Unreliable sends, FireList and exports serialize into the Scratch writer.
+--> Unreliable sends serialize past the end of the loaded writer (its unsent data before
+--> Start is left as it was), then Cut takes the event back out as a packet of its own:
+--> no writer switch. Returns the packet and its instances (nil when there are none).
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Cut
+Cut = function(Start: number, InstanceStart: number): (buffer, {any}?)
+    local Size = SendCursor - Start
+    local Out = NewOut(Size)
+    buffer.copy(Out, 0, SendBuffer, Start, Size)
+    SendCursor = Start
+
+    local Count = #SendInstances
+    if Count == InstanceStart then
+        return Out, nil
+    end
+
+    local Instances = table.move(SendInstances, InstanceStart + 1, Count, 1, {})
+    for Index = Count, InstanceStart + 1, -1 do
+        SendInstances[Index] = nil
+    end
+    return Out, Instances
+end
+
+--> Reliable FireList and exports serialize into the Scratch writer.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local BeginScratch
 BeginScratch = function()

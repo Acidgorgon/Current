@@ -23,65 +23,57 @@ if not Unreliable then
     Unreliable = UnreliableRemoteEvent
 end
 
---> Unreliable sends: the event was serialized into Scratch.
+--> Unreliable sends: the event was serialized past the end of the loaded writer, from Start.
 --> Every send leaves out the instance array when it is empty: an empty table would still
 --> be serialized by the remote and rebuilt by the receiver on every packet.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliable
-SendUnreliable = function(Player: Player)
-    Save(Scratch)
-    if #SendInstances > 0 then
-        Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
+SendUnreliable = function(Player: Player, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
+    if Instances then
+        Unreliable:FireClient(Player, Packet, Instances)
     else
-        Unreliable:FireClient(Player, Pack(Scratch))
+        Unreliable:FireClient(Player, Packet)
     end
-    EndScratch()
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableAll
-SendUnreliableAll = function()
-    Save(Scratch)
-    if #SendInstances > 0 then
-        Unreliable:FireAllClients(Pack(Scratch), SendInstances)
+SendUnreliableAll = function(Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
+    if Instances then
+        Unreliable:FireAllClients(Packet, Instances)
     else
-        Unreliable:FireAllClients(Pack(Scratch))
+        Unreliable:FireAllClients(Packet)
     end
-    EndScratch()
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableList
-SendUnreliableList = function(List: {Player})
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
-    local Instances = if #SendInstances > 0 then SendInstances else nil
+SendUnreliableList = function(List: {Player}, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
     for _, Player in List do
         if Instances then
-            Unreliable:FireClient(Player, Buffer, Instances)
+            Unreliable:FireClient(Player, Packet, Instances)
         else
-            Unreliable:FireClient(Player, Buffer)
+            Unreliable:FireClient(Player, Packet)
         end
     end
-    EndScratch()
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableExcept
-SendUnreliableExcept = function(Except: Player)
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
-    local Instances = if #SendInstances > 0 then SendInstances else nil
+SendUnreliableExcept = function(Except: Player, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
     for _, Player in Players:GetPlayers() do
         if Player ~= Except then
             if Instances then
-                Unreliable:FireClient(Player, Buffer, Instances)
+                Unreliable:FireClient(Player, Packet, Instances)
             else
-                Unreliable:FireClient(Player, Buffer)
+                Unreliable:FireClient(Player, Packet)
             end
         end
     end
-    EndScratch()
 end
 
 -- RELIABLE --

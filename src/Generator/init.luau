@@ -156,33 +156,33 @@ end
 ]],
 		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> ()): any
     return function(Player: Player, ...)
-        BeginScratch()
+        local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
-        SendUnreliable(Player)
+        SendUnreliable(Player, Start, InstanceStart)
     end
 end
 ]],
 		UnreliableFireAll = [[local function UnreliableFireAll(Write: (...any) -> ()): any
     return function(...)
-        BeginScratch()
+        local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
-        SendUnreliableAll()
+        SendUnreliableAll(Start, InstanceStart)
     end
 end
 ]],
 		UnreliableFireList = [[local function UnreliableFireList(Write: (...any) -> ()): any
     return function(List: {Player}, ...)
-        BeginScratch()
+        local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
-        SendUnreliableList(List)
+        SendUnreliableList(List, Start, InstanceStart)
     end
 end
 ]],
 		UnreliableFireExcept = [[local function UnreliableFireExcept(Write: (...any) -> ()): any
     return function(Except: Player, ...)
-        BeginScratch()
+        local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
-        SendUnreliableExcept(Except)
+        SendUnreliableExcept(Except, Start, InstanceStart)
     end
 end
 ]],
@@ -190,9 +190,9 @@ end
 	Client = {
 		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> ()): any
     return function(...)
-        BeginScratch()
+        local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
-        SendUnreliable()
+        SendUnreliable(Start, InstanceStart)
     end
 end
 ]],

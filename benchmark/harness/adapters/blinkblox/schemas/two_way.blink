@@ -1,0 +1,27 @@
+-- two_way: BlinkBlox has no `From: Both` (an event's From is Server or
+-- Client), so the Blink Ping event needs 2 declarations here: PingDown
+-- (server -> client) and PingUp (client -> server), same type and call mode.
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+-- Inbound limits raised as in BlinkBlox's own benchmark/definitions (see
+-- the other schemas in this folder).
+option MaxPacketSize = 2097152
+option MaxEventsPerPacket = 2048
+option MaxInstancesPerPacket = 2048
+option InboundBytesPerSecond = 1073741824
+option InboundBurst = 1073741824
+
+event PingDown {
+    From: Server,
+    Type: Reliable,
+    Call: ManySync,
+    Data: u32
+}
+
+event PingUp {
+    From: Client,
+    Type: Reliable,
+    Call: ManySync,
+    Data: u32
+}

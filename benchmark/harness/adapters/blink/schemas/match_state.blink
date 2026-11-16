@@ -1,0 +1,39 @@
+-- match_state: the 30 Hz authoritative match snapshot of a 22-player football
+-- match, broadcast to every client. Sent both as a Reliable and as an
+-- Unreliable event (the driver picks one per scenario variant).
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+enum Phase = { Warmup, Kickoff, Play, Goal, HalfTime, FullTime }
+enum Stance = { Idle, Jogging, Sprinting, Dribbling, Tackling, Diving }
+
+struct PlayerState {
+    Id: u16,
+    Pos: vector<f32>,
+    Vel: vector<f16>,
+    Stamina: u8,
+    State: Stance
+}
+
+struct MatchState {
+    Ball: vector<f32>,
+    Clock: f32,
+    HomeScore: u8,
+    AwayScore: u8,
+    Phase: Phase,
+    Players: PlayerState[0..32]
+}
+
+event MatchReliable {
+    From: Server,
+    Type: Reliable,
+    Call: ManyAsync,
+    Data: MatchState
+}
+
+event MatchUnreliable {
+    From: Server,
+    Type: Unreliable,
+    Call: SingleSync,
+    Data: MatchState
+}

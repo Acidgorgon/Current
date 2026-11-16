@@ -1,0 +1,13 @@
+{
+  "_comment": "Scenario registry: driver file scenarios/<name>.luau, the schema (per-library definitions live in adapters/<adapter>/), whether it only exists in blink-plus, and frames_scale, a multiplier on --frames so cheap scenarios run long enough for stable timings.",
+  "scenarios": [
+    {"name": "match_state_reliable", "schema": "match_state", "fork_only": false, "desc": "server FireAll 22-player match snapshot to 44 clients, Reliable, ManyAsync", "frames_scale": 1},
+    {"name": "match_state_unreliable", "schema": "match_state", "fork_only": false, "desc": "server FireAll 22-player match snapshot to 44 clients, Unreliable, SingleSync", "frames_scale": 1},
+    {"name": "per_player", "schema": "per_player", "fork_only": false, "desc": "server Fire(player) 5 small reliable events to each of 44 players", "frames_scale": 3},
+    {"name": "client_input", "schema": "client_input", "fork_only": false, "desc": "44 clients fire Unreliable input every frame + Reliable action every 4th", "frames_scale": 3},
+    {"name": "many_events", "schema": "many_events", "fork_only": false, "desc": "120 declared events, 24 fired per frame (FireAll) across the index range", "frames_scale": 1},
+    {"name": "burst_async", "schema": "burst", "fork_only": false, "desc": "1 client receives 200 events in one frame, ManyAsync listener", "frames_scale": 5},
+    {"name": "burst_sync", "schema": "burst", "fork_only": false, "desc": "1 client receives 200 events in one frame, SingleSync listener", "frames_scale": 5},
+    {"name": "two_way", "schema": "two_way", "fork_only": true, "desc": "From: Both event, server FireAll + every client Fire on the same event", "frames_scale": 3}
+  ]
+}

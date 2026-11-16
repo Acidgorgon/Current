@@ -1,0 +1,24 @@
+-- burst: one client receives 200 events in a single frame, once through a
+-- ManyAsync listener and once through a SingleSync listener.
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+struct Hit {
+    Id: u16,
+    Pos: vector<f32>,
+    Damage: u8
+}
+
+event HitAsync {
+    From: Server,
+    Type: Reliable,
+    Call: ManyAsync,
+    Data: Hit
+}
+
+event HitSync {
+    From: Server,
+    Type: Reliable,
+    Call: SingleSync,
+    Data: Hit
+}

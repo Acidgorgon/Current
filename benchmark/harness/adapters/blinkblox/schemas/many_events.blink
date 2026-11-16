@@ -1,0 +1,140 @@
+-- BlinkBlox copy of adapters/blink/schemas/many_events.blink (same types; inbound limits raised).
+-- many_events: 120 declared server->client reliable events with small payloads.
+-- Traffic is spread across the whole index range to expose receive dispatch cost.
+-- Generated: for i in 1..120: data = (u8, u16) if i % 3 == 0 else u16;
+-- call = SingleSync if i is odd else ManySync.
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+-- BlinkBlox bounds inbound (client -> server) traffic by default: 8192 bytes
+-- and 64 events a packet, 256 instances, 65536 bytes a second per player.
+-- Raised exactly as BlinkBlox's own benchmark/definitions/*.blink raise them,
+-- so the benchmark measures the work and not refusals (the harness runs
+-- frames far faster than 30 Hz of wall-clock time, which a per-second
+-- budget would otherwise throttle).
+option MaxPacketSize = 2097152
+option MaxEventsPerPacket = 2048
+option MaxInstancesPerPacket = 2048
+option InboundBytesPerSecond = 1073741824
+option InboundBurst = 1073741824
+
+event E001 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E002 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E003 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E004 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E005 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E006 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E007 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E008 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E009 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E010 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E011 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E012 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E013 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E014 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E015 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E016 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E017 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E018 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E019 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E020 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E021 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E022 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E023 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E024 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E025 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E026 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E027 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E028 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E029 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E030 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E031 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E032 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E033 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E034 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E035 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E036 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E037 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E038 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E039 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E040 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E041 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E042 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E043 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E044 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E045 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E046 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E047 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E048 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E049 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E050 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E051 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E052 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E053 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E054 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E055 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E056 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E057 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E058 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E059 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E060 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E061 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E062 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E063 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E064 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E065 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E066 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E067 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E068 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E069 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E070 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E071 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E072 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E073 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E074 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E075 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E076 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E077 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E078 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E079 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E080 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E081 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E082 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E083 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E084 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E085 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E086 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E087 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E088 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E089 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E090 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E091 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E092 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E093 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E094 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E095 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E096 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E097 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E098 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E099 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E100 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E101 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E102 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E103 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E104 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E105 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E106 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E107 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E108 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E109 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E110 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E111 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E112 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E113 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E114 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }
+event E115 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E116 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E117 { From: Server, Type: Reliable, Call: SingleSync, Data: (u8, u16) }
+event E118 { From: Server, Type: Reliable, Call: ManySync, Data: u16 }
+event E119 { From: Server, Type: Reliable, Call: SingleSync, Data: u16 }
+event E120 { From: Server, Type: Reliable, Call: ManySync, Data: (u8, u16) }

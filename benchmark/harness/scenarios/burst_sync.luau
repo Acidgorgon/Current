@@ -1,0 +1,3 @@
+-- burst, SingleSync listener variant: 200 events to one client in one frame.
+local H = ...
+return H.import("scenarios/common/burst.luau", H)("Sync")

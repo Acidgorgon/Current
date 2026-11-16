@@ -1,0 +1,11 @@
+-- two_way (fork-only): a single event that both sides can fire.
+-- Uses `From: Both`, which stock Blink does not support.
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+event Ping {
+    From: Both,
+    Type: Reliable,
+    Call: ManySync,
+    Data: u32
+}

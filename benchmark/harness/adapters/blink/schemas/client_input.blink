@@ -1,0 +1,33 @@
+-- client_input: every client streams its input each frame (Unreliable) and
+-- occasionally sends a reliable gameplay action.
+option ClientOutput = "@CLIENT_OUTPUT@"
+option ServerOutput = "@SERVER_OUTPUT@"
+
+set Buttons = { Sprint, Shoot, Pass, Tackle, Jump, Dive }
+enum ActionKind = { Shoot, Pass, Tackle, Header, Emote }
+
+struct InputFrame {
+    Seq: u8,
+    Dir: vector,
+    Buttons: Buttons
+}
+
+struct Action {
+    Kind: ActionKind,
+    Target: u16,
+    Power: f32
+}
+
+event Input {
+    From: Client,
+    Type: Unreliable,
+    Call: SingleSync,
+    Data: InputFrame
+}
+
+event PlayerAction {
+    From: Client,
+    Type: Reliable,
+    Call: ManyAsync,
+    Data: Action
+}

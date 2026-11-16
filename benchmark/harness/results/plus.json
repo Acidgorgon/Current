@@ -1,0 +1,2288 @@
+{
+ "adapter": "blink",
+ "config": {
+  "frames": 600,
+  "interleaved_with": [
+   "stock",
+   "zap",
+   "blinkblox",
+   "remotes"
+  ],
+  "modes": [
+   "interp",
+   "native"
+  ],
+  "runs": 7,
+  "warmup": 120
+ },
+ "date": "2026-11-16T11:57:29",
+ "host": {
+  "cpus": 4,
+  "luau": "0.700 (luau-bench)",
+  "machine": "x86_64"
+ },
+ "label": "plus",
+ "scenarios": {
+  "burst_async": {
+   "desc": "1 client receives 200 events in one frame, ManyAsync listener",
+   "fork_only": false,
+   "frames": 3000,
+   "interp": {
+    "adapter": "blink",
+    "clients": 1,
+    "frames": 3000,
+    "heap": {
+     "after_setup": 694390,
+     "client_code": 19071,
+     "client_module": 25687,
+     "client_state": 6616,
+     "server_code": 30449,
+     "server_module": 41289,
+     "server_state": 10840,
+     "steady": 712854,
+     "steady_growth": 18464
+    },
+    "load": {
+     "client_compile_us": 512.3330001879367,
+     "client_init_alloc_bytes": 10600,
+     "client_init_allocs": 145,
+     "client_init_us": 22.14599999206257,
+     "server_alloc_bytes": 111815,
+     "server_allocs": 505,
+     "server_compile_us": 774.1290000922163,
+     "server_init_us": 26.672000331018353
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 72.20767800148072
+     },
+     "client_recv_max_client_us": 72.20767800148072,
+     "client_recv_per_client": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 72.20767800148072
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.5267519967067832
+     },
+     "network": {
+      "alloc_bytes": 3544,
+      "allocs": 6,
+      "us": 2.3309159995127025
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.22755366596053742
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 46.49010666738226
+     },
+     "server_step": {
+      "alloc_bytes": 3208,
+      "allocs": 1,
+      "us": 1.7610186619094748
+     },
+     "total": {
+      "alloc_bytes": 38408,
+      "allocs": 401,
+      "us": 121.02516033201027
+     }
+    },
+    "run_wall_s": 0.4236327489998075,
+    "runs": 7,
+    "scenario": "burst_async",
+    "schema": "burst",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      70.54071100219517,
+      76.74595033646862
+     ],
+     "client_recv_per_client": [
+      70.54071100219517,
+      76.74595033646862
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      0.5008439919341375,
+      0.5443803335462386
+     ],
+     "network": [
+      2.2449190003802264,
+      2.575066335490798
+     ],
+     "server_recv": [
+      0.2157263320441416,
+      0.2450339995145138
+     ],
+     "server_send": [
+      45.961074660378166,
+      48.812757662441676
+     ],
+     "server_step": [
+      1.7096486717491644,
+      1.9312913307961328
+     ],
+     "total": [
+      118.95391266307342,
+      128.1676083281127
+     ]
+    },
+    "verify_checks": 280200,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3205,
+     "s2c_calls_per_frame": 1,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 1,
+    "frames": 3000,
+    "heap": {
+     "after_setup": 694390,
+     "client_code": 19071,
+     "client_module": 25687,
+     "client_state": 6616,
+     "server_code": 30449,
+     "server_module": 41289,
+     "server_state": 10840,
+     "steady": 712854,
+     "steady_growth": 18464
+    },
+    "load": {
+     "client_compile_us": 1527.3479998541006,
+     "client_init_alloc_bytes": 10600,
+     "client_init_allocs": 145,
+     "client_init_us": 33.99900015210733,
+     "server_alloc_bytes": 111815,
+     "server_allocs": 505,
+     "server_compile_us": 2403.9610002546397,
+     "server_init_us": 34.562000109872315
+    },
+    "native": true,
+    "native_code_bytes": 695256,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 48.80489800567981
+     },
+     "client_recv_max_client_us": 48.80489800567981,
+     "client_recv_per_client": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 48.80489800567981
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.4689190006198866
+     },
+     "network": {
+      "alloc_bytes": 3544,
+      "allocs": 6,
+      "us": 1.8508193340191308
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.18210899725090712
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 33.805703001538255
+     },
+     "server_step": {
+      "alloc_bytes": 3208,
+      "allocs": 1,
+      "us": 1.4051033375229356
+     },
+     "total": {
+      "alloc_bytes": 38408,
+      "allocs": 401,
+      "us": 84.95018100772236
+     }
+    },
+    "run_wall_s": 0.29673828999966645,
+    "runs": 7,
+    "scenario": "burst_async",
+    "schema": "burst",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      45.89885566777715,
+      56.23106499463878
+     ],
+     "client_recv_per_client": [
+      45.89885566777715,
+      56.23106499463878
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      0.4444013361535326,
+      0.5731620041539524
+     ],
+     "network": [
+      1.5228353274020872,
+      2.851366335714071
+     ],
+     "server_recv": [
+      0.17299466586943404,
+      0.21580133473738292
+     ],
+     "server_send": [
+      32.928212663591694,
+      38.71104500603906
+     ],
+     "server_step": [
+      1.3179363346959387,
+      1.6771190000023732
+     ],
+     "total": [
+      81.19435200448302,
+      97.40819233957153
+     ]
+    },
+    "verify_checks": 280200,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3205,
+     "s2c_calls_per_frame": 1,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "burst"
+  },
+  "burst_sync": {
+   "desc": "1 client receives 200 events in one frame, SingleSync listener",
+   "fork_only": false,
+   "frames": 3000,
+   "interp": {
+    "adapter": "blink",
+    "clients": 1,
+    "frames": 3000,
+    "heap": {
+     "after_setup": 694389,
+     "client_code": 19071,
+     "client_module": 25687,
+     "client_state": 6616,
+     "server_code": 30449,
+     "server_module": 41289,
+     "server_state": 10840,
+     "steady": 711685,
+     "steady_growth": 17296
+    },
+    "load": {
+     "client_compile_us": 498.43999977383646,
+     "client_init_alloc_bytes": 10600,
+     "client_init_allocs": 145,
+     "client_init_us": 22.183000055520097,
+     "server_alloc_bytes": 111815,
+     "server_allocs": 505,
+     "server_compile_us": 736.319000225194,
+     "server_init_us": 25.642999844421865
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 46.34860899780809
+     },
+     "client_recv_max_client_us": 46.34860899780809,
+     "client_recv_per_client": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 46.34860899780809
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.5147899943646431
+     },
+     "network": {
+      "alloc_bytes": 3544,
+      "allocs": 6,
+      "us": 2.3345263374115652
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.21729733013368482
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 47.6701623374538
+     },
+     "server_step": {
+      "alloc_bytes": 3208,
+      "allocs": 1,
+      "us": 1.7131753373481236
+     },
+     "total": {
+      "alloc_bytes": 38408,
+      "allocs": 401,
+      "us": 96.45045733244237
+     }
+    },
+    "run_wall_s": 0.35075789000029545,
+    "runs": 7,
+    "scenario": "burst_sync",
+    "schema": "burst",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      45.80124132962737,
+      53.34230066273449
+     ],
+     "client_recv_per_client": [
+      45.80124132962737,
+      53.34230066273449
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      0.49103433896865073,
+      0.5841913260458872
+     ],
+     "network": [
+      2.2502923347929027,
+      2.70814933416356
+     ],
+     "server_recv": [
+      0.2116390008571519,
+      0.2375889994254976
+     ],
+     "server_send": [
+      46.6128670030533,
+      55.8167500013648
+     ],
+     "server_step": [
+      1.6717800003789307,
+      1.9175556740265165
+     ],
+     "total": [
+      94.808283011389,
+      111.8983866635972
+     ]
+    },
+    "verify_checks": 280200,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3205,
+     "s2c_calls_per_frame": 1,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 1,
+    "frames": 3000,
+    "heap": {
+     "after_setup": 694389,
+     "client_code": 19071,
+     "client_module": 25687,
+     "client_state": 6616,
+     "server_code": 30449,
+     "server_module": 41289,
+     "server_state": 10840,
+     "steady": 711685,
+     "steady_growth": 17296
+    },
+    "load": {
+     "client_compile_us": 1540.869999644201,
+     "client_init_alloc_bytes": 10600,
+     "client_init_allocs": 145,
+     "client_init_us": 32.34699988752254,
+     "server_alloc_bytes": 111815,
+     "server_allocs": 505,
+     "server_compile_us": 2460.801999859541,
+     "server_init_us": 35.08300005705678
+    },
+    "native": true,
+    "native_code_bytes": 695256,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 24.862701655365527
+     },
+     "client_recv_max_client_us": 24.862701655365527,
+     "client_recv_per_client": {
+      "alloc_bytes": 35200,
+      "allocs": 400,
+      "us": 24.862701655365527
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.42085634277100326
+     },
+     "network": {
+      "alloc_bytes": 3544,
+      "allocs": 6,
+      "us": 1.5854666650435927
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.17062400199089703
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 33.6715909988925
+     },
+     "server_step": {
+      "alloc_bytes": 3208,
+      "allocs": 1,
+      "us": 1.328982670050512
+     },
+     "total": {
+      "alloc_bytes": 38408,
+      "allocs": 401,
+      "us": 60.40359701152435
+     }
+    },
+    "run_wall_s": 0.21922802700009925,
+    "runs": 7,
+    "scenario": "burst_sync",
+    "schema": "burst",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      24.14746166459736,
+      32.1322409934813
+     ],
+     "client_recv_per_client": [
+      24.14746166459736,
+      32.1322409934813
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      0.41013266672962345,
+      0.7051796643888034
+     ],
+     "network": [
+      1.5059333383457367,
+      2.4143089948059546
+     ],
+     "server_recv": [
+      0.16225466121492596,
+      0.269181669561173
+     ],
+     "server_send": [
+      33.1855823354393,
+      42.396910331262916
+     ],
+     "server_step": [
+      1.2739933316273284,
+      2.0370776657424963
+     ],
+     "total": [
+      59.28107332132034,
+      77.54059032443668
+     ]
+    },
+    "verify_checks": 280200,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3205,
+     "s2c_calls_per_frame": 1,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "burst"
+  },
+  "client_input": {
+   "desc": "44 clients fire Unreliable input every frame + Reliable action every 4th",
+   "fork_only": false,
+   "frames": 1800,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 2025245,
+     "client_code": 18616,
+     "client_module": 25493.818181818184,
+     "client_state": 6877.818181818182,
+     "server_code": 32445,
+     "server_module": 42381,
+     "server_state": 9936,
+     "steady": 2060229,
+     "steady_growth": 34984
+    },
+    "load": {
+     "client_compile_us": 626.6949999371718,
+     "client_init_alloc_bytes": 10688,
+     "client_init_allocs": 143.04545454545453,
+     "client_init_us": 12.897909083552474,
+     "server_alloc_bytes": 116410,
+     "server_allocs": 487,
+     "server_compile_us": 866.3989997330646,
+     "server_init_us": 28.57100025721593
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 6.426084450544699
+     },
+     "client_recv_max_client_us": 0.5607077799949265,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.14604737387601588
+     },
+     "client_send": {
+      "alloc_bytes": 1012,
+      "allocs": 44,
+      "us": 37.60250336174269
+     },
+     "client_step": {
+      "alloc_bytes": 176,
+      "allocs": 11,
+      "us": 21.783182196991724
+     },
+     "network": {
+      "alloc_bytes": 3828,
+      "allocs": 110,
+      "us": 23.872771670944026
+     },
+     "server_recv": {
+      "alloc_bytes": 32912,
+      "allocs": 330,
+      "us": 49.840181107406856
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "server_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 1.9319811139616325
+     },
+     "total": {
+      "alloc_bytes": 34100,
+      "allocs": 385,
+      "us": 117.4043311357309
+     }
+    },
+    "run_wall_s": 0.3213630899999771,
+    "runs": 7,
+    "scenario": "client_input",
+    "schema": "client_input",
+    "sink": 11048334,
+    "spread": {
+     "client_recv": [
+      5.838644998827173,
+      8.151109452430521
+     ],
+     "client_recv_per_client": [
+      0.13269647724607211,
+      0.18525248755523913
+     ],
+     "client_send": [
+      34.999223875426345,
+      44.35304948123707
+     ],
+     "client_step": [
+      20.13046830067348,
+      27.08198943284717
+     ],
+     "network": [
+      21.7720138832394,
+      28.190703888968628
+     ],
+     "server_recv": [
+      45.48488777067582,
+      59.51259500180741
+     ],
+     "server_send": [
+      0,
+      0
+     ],
+     "server_step": [
+      1.7484261098211897,
+      2.420640008343374
+     ],
+     "total": [
+      108.25388330001968,
+      140.2845261456302
+     ]
+    },
+    "verify_checks": 262620,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 968,
+     "c2s_calls_per_frame": 55,
+     "s2c_bytes_per_frame": 0,
+     "s2c_calls_per_frame": 0,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 2025245,
+     "client_code": 18616,
+     "client_module": 25493.818181818184,
+     "client_state": 6877.818181818182,
+     "server_code": 32445,
+     "server_module": 42381,
+     "server_state": 9936,
+     "steady": 2060229,
+     "steady_growth": 34984
+    },
+    "load": {
+     "client_compile_us": 1682.1719996187312,
+     "client_init_alloc_bytes": 10688,
+     "client_init_allocs": 143.04545454545453,
+     "client_init_us": 12.798886369968056,
+     "server_alloc_bytes": 116410,
+     "server_allocs": 487,
+     "server_compile_us": 2556.336999987252,
+     "server_init_us": 38.268000025709625
+    },
+    "native": true,
+    "native_code_bytes": 706887,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 4.521959426205689
+     },
+     "client_recv_max_client_us": 0.3204494482310515,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.1027718051410384
+     },
+     "client_send": {
+      "alloc_bytes": 1012,
+      "allocs": 44,
+      "us": 23.347362766546414
+     },
+     "client_step": {
+      "alloc_bytes": 176,
+      "allocs": 11,
+      "us": 16.394607193382804
+     },
+     "network": {
+      "alloc_bytes": 3828,
+      "allocs": 110,
+      "us": 13.689620553678752
+     },
+     "server_recv": {
+      "alloc_bytes": 32912,
+      "allocs": 330,
+      "us": 40.05393221531348
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "server_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 1.1127499967895145
+     },
+     "total": {
+      "alloc_bytes": 34100,
+      "allocs": 385,
+      "us": 85.20509838919881
+     }
+    },
+    "run_wall_s": 0.22389964200010581,
+    "runs": 7,
+    "scenario": "client_input",
+    "schema": "client_input",
+    "sink": 11048334,
+    "spread": {
+     "client_recv": [
+      4.431138893323805,
+      4.719503879186959
+     ],
+     "client_recv_per_client": [
+      0.10070770212099557,
+      0.10726145179970362
+     ],
+     "client_send": [
+      23.221569448297586,
+      25.821495581921127
+     ],
+     "client_step": [
+      16.20987556584118,
+      17.81125277981725
+     ],
+     "network": [
+      13.483069451214963,
+      15.360722784912973
+     ],
+     "server_recv": [
+      38.357089445071324,
+      43.34852610908355
+     ],
+     "server_send": [
+      0,
+      0
+     ],
+     "server_step": [
+      1.0919549984262429,
+      1.310268337925259
+     ],
+     "total": [
+      83.56257218969807,
+      93.01104668793414
+     ]
+    },
+    "verify_checks": 262620,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 968,
+     "c2s_calls_per_frame": 55,
+     "s2c_bytes_per_frame": 0,
+     "s2c_calls_per_frame": 0,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "client_input"
+  },
+  "many_events": {
+   "desc": "120 declared events, 24 fired per frame (FireAll) across the index range",
+   "fork_only": false,
+   "frames": 600,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 6194341,
+     "client_code": 176735,
+     "client_module": 251532.0909090909,
+     "client_state": 74797.09090909091,
+     "server_code": 272017,
+     "server_module": 349561,
+     "server_state": 77544,
+     "steady": 6213429,
+     "steady_growth": 19088
+    },
+    "load": {
+     "client_compile_us": 3227.371999855677,
+     "client_init_alloc_bytes": 89377.09090909091,
+     "client_init_allocs": 959.0681818181819,
+     "client_init_us": 75.23815909073825,
+     "server_alloc_bytes": 780319,
+     "server_allocs": 4524,
+     "server_compile_us": 4901.051000160805,
+     "server_init_us": 71.57499976528925
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 389.6554699637515
+     },
+     "client_recv_max_client_us": 30.337791664957575,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 8.855806135539806
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 29.159466682813218
+     },
+     "network": {
+      "alloc_bytes": 9024,
+      "allocs": 135,
+      "us": 35.9875816851248
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.44764833167694934
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 13.00482500103802
+     },
+     "server_step": {
+      "alloc_bytes": 88,
+      "allocs": 1,
+      "us": 5.4792950034728465
+     },
+     "total": {
+      "alloc_bytes": 88,
+      "allocs": 1,
+      "us": 436.50346664890094
+     }
+    },
+    "run_wall_s": 0.3306534210000791,
+    "runs": 7,
+    "scenario": "many_events",
+    "schema": "many_events",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      374.7015317617297,
+      470.7771615737026
+     ],
+     "client_recv_per_client": [
+      8.515943903675675,
+      10.699480944856877
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      27.74138164568285,
+      30.57803168303508
+     ],
+     "network": [
+      34.99753998615537,
+      36.783793343602156
+     ],
+     "server_recv": [
+      0.41841165057121543,
+      0.5763383364865149
+     ],
+     "server_send": [
+      12.36253166325696,
+      13.120998317693497
+     ],
+     "server_step": [
+      5.112131680107268,
+      5.665335012660459
+     ],
+     "total": [
+      423.5476817840814,
+      517.810904933261
+     ]
+    },
+    "verify_checks": 128160,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3696,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 6194341,
+     "client_code": 176735,
+     "client_module": 251532.0909090909,
+     "client_state": 74797.09090909091,
+     "server_code": 272017,
+     "server_module": 349561,
+     "server_state": 77544,
+     "steady": 6213429,
+     "steady_growth": 19088
+    },
+    "load": {
+     "client_compile_us": 8185.959000002185,
+     "client_init_alloc_bytes": 89377.09090909091,
+     "client_init_allocs": 959.0681818181819,
+     "client_init_us": 72.91736364384798,
+     "server_alloc_bytes": 780319,
+     "server_allocs": 4524,
+     "server_compile_us": 12864.953999724094,
+     "server_init_us": 89.23399991545011
+    },
+    "native": true,
+    "native_code_bytes": 1620621,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 280.5754483892997
+     },
+     "client_recv_max_client_us": 31.750620000821073,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 6.376714736120448
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 22.62271494828383
+     },
+     "network": {
+      "alloc_bytes": 9024,
+      "allocs": 135,
+      "us": 29.384903321746
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.7601499873999273
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 19.78983165296692
+     },
+     "server_step": {
+      "alloc_bytes": 88,
+      "allocs": 1,
+      "us": 5.493390009784586
+     },
+     "total": {
+      "alloc_bytes": 88,
+      "allocs": 1,
+      "us": 329.64035340986203
+     }
+    },
+    "run_wall_s": 0.25948415399989244,
+    "runs": 7,
+    "scenario": "many_events",
+    "schema": "many_events",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      201.25967664929098,
+      284.30529332050963
+     ],
+     "client_recv_per_client": [
+      4.574083560211158,
+      6.461483939102492
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      18.123361579303793,
+      23.90610171081183
+     ],
+     "network": [
+      24.151038346644782,
+      30.67709333587724
+     ],
+     "server_recv": [
+      0.49021331885038916,
+      0.8988200026275687
+     ],
+     "server_send": [
+      14.012958323140387,
+      20.705411670102574
+     ],
+     "server_step": [
+      3.9997033256137606,
+      5.706688330064935
+     ],
+     "total": [
+      237.8859131961993,
+      333.9642483600377
+     ]
+    },
+    "verify_checks": 128160,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 3696,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "many_events"
+  },
+  "match_state_reliable": {
+   "desc": "server FireAll 22-player match snapshot to 44 clients, Reliable, ManyAsync",
+   "fork_only": false,
+   "frames": 600,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 2056281,
+     "client_code": 30838,
+     "client_module": 38547.09090909091,
+     "client_state": 7709.090909090909,
+     "server_code": 38536,
+     "server_module": 51568,
+     "server_state": 13032,
+     "steady": 2463925,
+     "steady_growth": 407644
+    },
+    "load": {
+     "client_compile_us": 1054.9159997026436,
+     "client_init_alloc_bytes": 11905.09090909091,
+     "client_init_allocs": 159.0681818181818,
+     "client_init_us": 12.18447727586119,
+     "server_alloc_bytes": 161651,
+     "server_allocs": 527,
+     "server_compile_us": 1140.8800000936026,
+     "server_init_us": 33.79400004632771
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 327650.9866666667,
+      "allocs": 2112.0733333333333,
+      "us": 435.2228649425645
+     },
+     "client_recv_max_client_us": 35.220733332910946,
+     "client_recv_per_client": {
+      "alloc_bytes": 7446.613333333334,
+      "allocs": 48.001666666666665,
+      "us": 9.891428748694649
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 27.476648378221096
+     },
+     "network": {
+      "alloc_bytes": 27887.84,
+      "allocs": 135.005,
+      "us": 33.157903353639995
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.44832999492427916
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 9.353281654208937
+     },
+     "server_step": {
+      "alloc_bytes": 513,
+      "allocs": 1,
+      "us": 5.3276366528128465
+     },
+     "total": {
+      "alloc_bytes": 328163.9866666667,
+      "allocs": 2113.0733333333333,
+      "us": 477.36467998674925
+     }
+    },
+    "run_wall_s": 0.41095262599992566,
+    "runs": 7,
+    "scenario": "match_state_reliable",
+    "schema": "match_state",
+    "sink": 4249663,
+    "spread": {
+     "client_recv": [
+      370.5352216434221,
+      468.94038170648855
+     ],
+     "client_recv_per_client": [
+      8.421255037350504,
+      10.65773594787474
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      19.315485013369955,
+      30.865593265237596
+     ],
+     "network": [
+      26.036694998765597,
+      36.13260834072207
+     ],
+     "server_recv": [
+      0.33813167268211447,
+      0.6210616690320118
+     ],
+     "server_send": [
+      8.079046662411807,
+      12.653116680970319
+     ],
+     "server_step": [
+      3.4684433474770535,
+      6.077468329597953
+     ],
+     "total": [
+      401.736328339363,
+      518.529578456158
+     ]
+    },
+    "verify_checks": 557820,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 22440,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 2056281,
+     "client_code": 30838,
+     "client_module": 38547.09090909091,
+     "client_state": 7709.090909090909,
+     "server_code": 38536,
+     "server_module": 51568,
+     "server_state": 13032,
+     "steady": 2463925,
+     "steady_growth": 407644
+    },
+    "load": {
+     "client_compile_us": 2702.88999990953,
+     "client_init_alloc_bytes": 11905.09090909091,
+     "client_init_allocs": 159.0681818181818,
+     "client_init_us": 10.548863635697423,
+     "server_alloc_bytes": 161651,
+     "server_allocs": 527,
+     "server_compile_us": 3880.3610000286426,
+     "server_init_us": 43.401000311860116
+    },
+    "native": true,
+    "native_code_bytes": 791243,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 327323.30666666664,
+      "allocs": 2112.0633333333335,
+      "us": 185.74434666637293
+     },
+     "client_recv_max_client_us": 17.050263337144617,
+     "client_recv_per_client": {
+      "alloc_bytes": 7439.1660606060605,
+      "allocs": 48.0014393939394,
+      "us": 4.221462424235749
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 18.575593254202733
+     },
+     "network": {
+      "alloc_bytes": 27833.226666666666,
+      "allocs": 135.00333333333333,
+      "us": 22.156891664811457
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.6207916673398964
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 3.7252283353457947
+     },
+     "server_step": {
+      "alloc_bytes": 513,
+      "allocs": 1,
+      "us": 4.1915999994065105
+     },
+     "total": {
+      "alloc_bytes": 327836.30666666664,
+      "allocs": 2113.0633333333335,
+      "us": 213.0764332923718
+     }
+    },
+    "run_wall_s": 0.22283989400011706,
+    "runs": 7,
+    "scenario": "match_state_reliable",
+    "schema": "match_state",
+    "sink": 4249663,
+    "spread": {
+     "client_recv": [
+      168.72888005461087,
+      197.41710327934925
+     ],
+     "client_recv_per_client": [
+      3.834747273968429,
+      4.486752347257937
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      16.062896562137514,
+      19.63737994932065
+     ],
+     "network": [
+      19.797353335585893,
+      24.281811661997683
+     ],
+     "server_recv": [
+      0.4289149880302527,
+      0.7116833171494363
+     ],
+     "server_send": [
+      3.088178345175644,
+      4.144720010875365
+     ],
+     "server_step": [
+      3.104491664392602,
+      4.49388331389855
+     ],
+     "total": [
+      191.41336161434688,
+      225.9046465648377
+     ]
+    },
+    "verify_checks": 557820,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 22440,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "match_state"
+  },
+  "match_state_unreliable": {
+   "desc": "server FireAll 22-player match snapshot to 44 clients, Unreliable, SingleSync",
+   "fork_only": false,
+   "frames": 600,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 2056987,
+     "client_code": 30838,
+     "client_module": 38547.09090909091,
+     "client_state": 7709.090909090909,
+     "server_code": 38536,
+     "server_module": 51568,
+     "server_state": 13032,
+     "steady": 2413239,
+     "steady_growth": 356252
+    },
+    "load": {
+     "client_compile_us": 1011.3829998772417,
+     "client_init_alloc_bytes": 11905.09090909091,
+     "client_init_allocs": 159.0681818181818,
+     "client_init_us": 11.911863638984373,
+     "server_alloc_bytes": 161651,
+     "server_allocs": 527,
+     "server_compile_us": 1158.737999958248,
+     "server_init_us": 31.31299990855041
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 327705.6,
+      "allocs": 2112.075,
+      "us": 392.5154733148399
+     },
+     "client_recv_max_client_us": 27.47590667164938,
+     "client_recv_per_client": {
+      "alloc_bytes": 7447.854545454545,
+      "allocs": 48.001704545454544,
+      "us": 8.920806211700906
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 23.24062835972048
+     },
+     "network": {
+      "alloc_bytes": 28160.906666666666,
+      "allocs": 135.01333333333332,
+      "us": 30.140853326277767
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.4008100101297411
+     },
+     "server_send": {
+      "alloc_bytes": 513,
+      "allocs": 1,
+      "us": 10.539425004481018
+     },
+     "server_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 2.96907166254338
+     },
+     "total": {
+      "alloc_bytes": 328218.6,
+      "allocs": 2113.075,
+      "us": 429.71800661689485
+     }
+    },
+    "run_wall_s": 0.37309010999979364,
+    "runs": 7,
+    "scenario": "match_state_unreliable",
+    "schema": "match_state",
+    "sink": 4249663,
+    "spread": {
+     "client_recv": [
+      385.3627617195343,
+      403.3472949474041
+     ],
+     "client_recv_per_client": [
+      8.758244584534872,
+      9.166983976077367
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      22.548363332740944,
+      24.41559331979685
+     ],
+     "network": [
+      29.869613329841133,
+      34.219183336669325
+     ],
+     "server_recv": [
+      0.35390333096074755,
+      0.4671833335123665
+     ],
+     "server_send": [
+      10.25461833251029,
+      10.665468343328635
+     ],
+     "server_step": [
+      2.8382616574162967,
+      3.172226662779091
+     ],
+     "total": [
+      421.96292339667707,
+      439.9018049593906
+     ]
+    },
+    "verify_checks": 557820,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 22440,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 600,
+    "heap": {
+     "after_setup": 2056987,
+     "client_code": 30838,
+     "client_module": 38547.09090909091,
+     "client_state": 7709.090909090909,
+     "server_code": 38536,
+     "server_module": 51568,
+     "server_state": 13032,
+     "steady": 2413239,
+     "steady_growth": 356252
+    },
+    "load": {
+     "client_compile_us": 2710.0349998363527,
+     "client_init_alloc_bytes": 11905.09090909091,
+     "client_init_allocs": 159.0681818181818,
+     "client_init_us": 11.015295451050571,
+     "server_alloc_bytes": 161651,
+     "server_allocs": 527,
+     "server_compile_us": 3718.7990001257276,
+     "server_init_us": 39.30299999410636
+    },
+    "native": true,
+    "native_code_bytes": 791243,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 327650.9866666667,
+      "allocs": 2112.0733333333333,
+      "us": 174.22204173499267
+     },
+     "client_recv_max_client_us": 15.074136657252287,
+     "client_recv_per_client": {
+      "alloc_bytes": 7446.613333333334,
+      "allocs": 48.001666666666665,
+      "us": 3.9595918576134697
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 17.568458358709904
+     },
+     "network": {
+      "alloc_bytes": 28106.293333333335,
+      "allocs": 135.01166666666666,
+      "us": 21.30128665612574
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.49762000344344415
+     },
+     "server_send": {
+      "alloc_bytes": 513,
+      "allocs": 1,
+      "us": 5.08841166113901
+     },
+     "server_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 2.36524501057526
+     },
+     "total": {
+      "alloc_bytes": 328163.9866666667,
+      "allocs": 2113.0733333333333,
+      "us": 199.0437484225064
+     }
+    },
+    "run_wall_s": 0.2100925439999628,
+    "runs": 7,
+    "scenario": "match_state_unreliable",
+    "schema": "match_state",
+    "sink": 4249663,
+    "spread": {
+     "client_recv": [
+      172.6167784060332,
+      203.59587162753692
+     ],
+     "client_recv_per_client": [
+      3.9231086001371183,
+      4.6271789006258395
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      17.203800017947895,
+      22.316518288031755
+     ],
+     "network": [
+      20.455509982184594,
+      25.689936665003188
+     ],
+     "server_recv": [
+      0.4178649980228026,
+      0.6604766667805961
+     ],
+     "server_send": [
+      4.706931671686713,
+      6.702515011056676
+     ],
+     "server_step": [
+      2.181793339938546,
+      2.9663116720257676
+     ],
+     "total": [
+      197.92654508667812,
+      236.2416932654317
+     ]
+    },
+    "verify_checks": 557820,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 22440,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "match_state"
+  },
+  "per_player": {
+   "desc": "server Fire(player) 5 small reliable events to each of 44 players",
+   "fork_only": false,
+   "frames": 1800,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 2200444,
+     "client_code": 26321,
+     "client_module": 34958.09090909091,
+     "client_state": 8637.09090909091,
+     "server_code": 36531,
+     "server_module": 49339,
+     "server_state": 12808,
+     "steady": 2309166,
+     "steady_growth": 108722
+    },
+    "load": {
+     "client_compile_us": 750.7549998990726,
+     "client_init_alloc_bytes": 13041.09090909091,
+     "client_init_allocs": 176.0681818181818,
+     "client_init_us": 12.95775000058215,
+     "server_alloc_bytes": 133659,
+     "server_allocs": 604,
+     "server_compile_us": 925.4840001631237,
+     "server_init_us": 27.052999939769506
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 34496,
+      "allocs": 431.2,
+      "us": 99.94011946648445
+     },
+     "client_recv_max_client_us": 9.673452771797505,
+     "client_recv_per_client": {
+      "alloc_bytes": 784,
+      "allocs": 9.799999999999999,
+      "us": 2.27136635151101
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 17.46290725501846
+     },
+     "network": {
+      "alloc_bytes": 14115.413333333334,
+      "allocs": 178,
+      "us": 30.854638887376495
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.3132050005660858
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 65.3015972213527
+     },
+     "server_step": {
+      "alloc_bytes": 2771.4133333333334,
+      "allocs": 44,
+      "us": 15.620183329348139
+     },
+     "total": {
+      "alloc_bytes": 37267.41333333333,
+      "allocs": 475.2,
+      "us": 198.22074339016478
+     }
+    },
+    "run_wall_s": 0.49858918900008575,
+    "runs": 7,
+    "scenario": "per_player",
+    "schema": "per_player",
+    "sink": 2999040,
+    "spread": {
+     "client_recv": [
+      97.23824776402681,
+      124.47681665182446
+     ],
+     "client_recv_per_client": [
+      2.2099601764551546,
+      2.8290185602687377
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      16.7127705392684,
+      23.772143870751783
+     ],
+     "network": [
+      28.905622774699523,
+      37.677221665338344
+     ],
+     "server_recv": [
+      0.27758000366399455,
+      0.3477705614487705
+     ],
+     "server_send": [
+      63.98219832792367,
+      76.53860499658549
+     ],
+     "server_step": [
+      15.094869446683232,
+      19.19862167116864
+     ],
+     "total": [
+      193.70780841326348,
+      244.33395775177917
+     ]
+    },
+    "verify_checks": 393824,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 2595.4133333333334,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 2200444,
+     "client_code": 26321,
+     "client_module": 34958.09090909091,
+     "client_state": 8637.09090909091,
+     "server_code": 36531,
+     "server_module": 49339,
+     "server_state": 12808,
+     "steady": 2309166,
+     "steady_growth": 108722
+    },
+    "load": {
+     "client_compile_us": 2054.4929998322914,
+     "client_init_alloc_bytes": 13041.09090909091,
+     "client_init_allocs": 176.0681818181818,
+     "client_init_us": 11.76195455214342,
+     "server_alloc_bytes": 133659,
+     "server_allocs": 604,
+     "server_compile_us": 2788.80299993034,
+     "server_init_us": 34.41300032136496
+    },
+    "native": true,
+    "native_code_bytes": 760849,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 34496,
+      "allocs": 431.2,
+      "us": 66.39593832131949
+     },
+     "client_recv_max_client_us": 5.545929451121386,
+     "client_recv_per_client": {
+      "alloc_bytes": 784,
+      "allocs": 9.799999999999999,
+      "us": 1.5089985982118066
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0
+     },
+     "client_step": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 13.799978890650285
+     },
+     "network": {
+      "alloc_bytes": 14115.413333333334,
+      "allocs": 178,
+      "us": 19.993441106483562
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.272590005655123
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 52.671535000475465
+     },
+     "server_step": {
+      "alloc_bytes": 2771.4133333333334,
+      "allocs": 44,
+      "us": 13.648734450776423
+     },
+     "total": {
+      "alloc_bytes": 37267.41333333333,
+      "allocs": 475.2,
+      "us": 145.97005887708292
+     }
+    },
+    "run_wall_s": 0.3640103750003618,
+    "runs": 7,
+    "scenario": "per_player",
+    "schema": "per_player",
+    "sink": 2999040,
+    "spread": {
+     "client_recv": [
+      63.21102109672615,
+      78.27913613659297
+     ],
+     "client_recv_per_client": [
+      1.4366141158346852,
+      1.7790712758316582
+     ],
+     "client_send": [
+      0,
+      0
+     ],
+     "client_step": [
+      12.976481681208599,
+      16.56168554771082
+     ],
+     "network": [
+      18.324490002012478,
+      22.911451106513898
+     ],
+     "server_recv": [
+      0.24970389606298543,
+      0.3461150042009346
+     ],
+     "server_send": [
+      50.765691668554304,
+      58.6712333367561
+     ],
+     "server_step": [
+      13.052017783492273,
+      16.311576112507787
+     ],
+     "total": [
+      140.25491612604432,
+      170.1697461377686
+     ]
+    },
+    "verify_checks": 393824,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 0,
+     "c2s_calls_per_frame": 0,
+     "s2c_bytes_per_frame": 2595.4133333333334,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "per_player"
+  },
+  "two_way": {
+   "desc": "From: Both event, server FireAll + every client Fire on the same event",
+   "fork_only": true,
+   "frames": 1800,
+   "interp": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 1965959,
+     "client_code": 17158,
+     "client_module": 23602,
+     "client_state": 6444,
+     "server_code": 30983,
+     "server_module": 41999,
+     "server_state": 11016,
+     "steady": 1967423,
+     "steady_growth": 1464
+    },
+    "load": {
+     "client_compile_us": 574.5620001107454,
+     "client_init_alloc_bytes": 10400,
+     "client_init_allocs": 139.04545454545453,
+     "client_init_us": 10.96534090679184,
+     "server_alloc_bytes": 108319,
+     "server_allocs": 494,
+     "server_compile_us": 722.747000054369,
+     "server_init_us": 25.31200016164803
+    },
+    "native": false,
+    "native_code_bytes": 0,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 23.269750532158973
+     },
+     "client_recv_max_client_us": 1.5428022235634369,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.5288579666399766
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 8.54701057076252
+     },
+     "client_step": {
+      "alloc_bytes": 704,
+      "allocs": 44,
+      "us": 28.963900567507356
+     },
+     "network": {
+      "alloc_bytes": 8672,
+      "allocs": 223,
+      "us": 42.78714832884766
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 14.590568335329912
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.36689055883066934
+     },
+     "server_step": {
+      "alloc_bytes": 16,
+      "allocs": 1,
+      "us": 2.1112155486156956
+     },
+     "total": {
+      "alloc_bytes": 720,
+      "allocs": 45,
+      "us": 78.1436877526984
+     }
+    },
+    "run_wall_s": 0.28503664499976367,
+    "runs": 7,
+    "scenario": "two_way",
+    "schema": "two_way",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      22.64510721715851,
+      24.33381274967259
+     ],
+     "client_recv_per_client": [
+      0.5146615276626935,
+      0.5530411988561952
+     ],
+     "client_send": [
+      8.342012194791298,
+      9.035608319562824
+     ],
+     "client_step": [
+      27.78344001828575,
+      29.505395018279362
+     ],
+     "network": [
+      40.00789222623603,
+      45.5233494441624
+     ],
+     "server_recv": [
+      14.307351660186718,
+      15.177138331839362
+     ],
+     "server_send": [
+      0.35259055519216215,
+      0.3973177778486085
+     ],
+     "server_step": [
+      2.0096105537150937,
+      2.2958072243757974
+     ],
+     "total": [
+      75.4463505336389,
+      80.74507942157854
+     ]
+    },
+    "verify_checks": 316800,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 396,
+     "c2s_calls_per_frame": 44,
+     "s2c_bytes_per_frame": 396,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "native": {
+    "adapter": "blink",
+    "clients": 44,
+    "frames": 1800,
+    "heap": {
+     "after_setup": 1969326,
+     "client_code": 17158,
+     "client_module": 23602,
+     "client_state": 6444,
+     "server_code": 30983,
+     "server_module": 41999,
+     "server_state": 11016,
+     "steady": 1970790,
+     "steady_growth": 1464
+    },
+    "load": {
+     "client_compile_us": 1460.9539998673426,
+     "client_init_alloc_bytes": 10400,
+     "client_init_allocs": 139.04545454545453,
+     "client_init_us": 10.43843181750245,
+     "server_alloc_bytes": 108319,
+     "server_allocs": 494,
+     "server_compile_us": 2298.9809999671706,
+     "server_init_us": 33.39200020491262
+    },
+    "native": true,
+    "native_code_bytes": 682318,
+    "optlevel": 2,
+    "phases": {
+     "client_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 15.407705544576958
+     },
+     "client_recv_max_client_us": 1.0555550036567891,
+     "client_recv_per_client": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.3501751260131127
+     },
+     "client_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 5.524372839873751
+     },
+     "client_step": {
+      "alloc_bytes": 704,
+      "allocs": 44,
+      "us": 24.3417733481187
+     },
+     "network": {
+      "alloc_bytes": 8672,
+      "allocs": 223,
+      "us": 26.973794993207573
+     },
+     "server_recv": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 12.394835548295507
+     },
+     "server_send": {
+      "alloc_bytes": 0,
+      "allocs": 0,
+      "us": 0.27810833747328917
+     },
+     "server_step": {
+      "alloc_bytes": 16,
+      "allocs": 1,
+      "us": 1.593074438864682
+     },
+     "total": {
+      "alloc_bytes": 720,
+      "allocs": 45,
+      "us": 59.545110538642305
+     }
+    },
+    "run_wall_s": 0.21079353899995112,
+    "runs": 7,
+    "scenario": "two_way",
+    "schema": "two_way",
+    "sink": 0,
+    "spread": {
+     "client_recv": [
+      14.862690022710012,
+      17.928536138545798
+     ],
+     "client_recv_per_client": [
+      0.33778840960704576,
+      0.4074667304214954
+     ],
+     "client_send": [
+      5.261033829810913,
+      6.038664456456091
+     ],
+     "client_step": [
+      23.238255583793133,
+      29.097908305983665
+     ],
+     "network": [
+      25.692852778370757,
+      30.608292226790784
+     ],
+     "server_recv": [
+      12.060093328424651,
+      14.232562218947148
+     ],
+     "server_send": [
+      0.23099444585265397,
+      0.32274111137869316
+     ],
+     "server_step": [
+      1.4602044439016026,
+      2.0404833344400686
+     ],
+     "total": [
+      57.30543884106333,
+      69.66089556575147
+     ]
+    },
+    "verify_checks": 316800,
+    "warmup": 120,
+    "warning_samples": {},
+    "warnings": 0,
+    "wire": {
+     "c2s_bytes_per_frame": 396,
+     "c2s_calls_per_frame": 44,
+     "s2c_bytes_per_frame": 396,
+     "s2c_calls_per_frame": 44,
+     "unreliable_oversize": 0
+    }
+   },
+   "schema": "two_way"
+  }
+ },
+ "source": "/tmp/claude-0/work/blink",
+ "static": {
+  "burst": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 9123,
+     "chunk_heap_bytes": 24470,
+     "native_code_bytes": 59206,
+     "source_bytes": 12968,
+     "source_lines": 461
+    },
+    "server.luau": {
+     "bytecode_bytes": 15033,
+     "chunk_heap_bytes": 29135,
+     "native_code_bytes": 108527,
+     "source_bytes": 20844,
+     "source_lines": 690
+    }
+   }
+  },
+  "client_input": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 8997,
+     "chunk_heap_bytes": 18731,
+     "native_code_bytes": 58647,
+     "source_bytes": 13583,
+     "source_lines": 457
+    },
+    "server.luau": {
+     "bytecode_bytes": 17788,
+     "chunk_heap_bytes": 30642,
+     "native_code_bytes": 108455,
+     "source_bytes": 21543,
+     "source_lines": 683
+    }
+   }
+  },
+  "many_events": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 102141,
+     "chunk_heap_bytes": 171691,
+     "native_code_bytes": 414150,
+     "source_bytes": 94502,
+     "source_lines": 3631
+    },
+    "server.luau": {
+     "bytecode_bytes": 126539,
+     "chunk_heap_bytes": 266694,
+     "native_code_bytes": 679526,
+     "source_bytes": 138056,
+     "source_lines": 4923
+    }
+   }
+  },
+  "match_state": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 19202,
+     "chunk_heap_bytes": 31039,
+     "native_code_bytes": 90854,
+     "source_bytes": 24640,
+     "source_lines": 741
+    },
+    "server.luau": {
+     "bytecode_bytes": 21808,
+     "chunk_heap_bytes": 36693,
+     "native_code_bytes": 149886,
+     "source_bytes": 34199,
+     "source_lines": 949
+    }
+   }
+  },
+  "per_player": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 14480,
+     "chunk_heap_bytes": 26507,
+     "native_code_bytes": 75046,
+     "source_bytes": 16658,
+     "source_lines": 571
+    },
+    "server.luau": {
+     "bytecode_bytes": 17682,
+     "chunk_heap_bytes": 34689,
+     "native_code_bytes": 126991,
+     "source_bytes": 25364,
+     "source_lines": 826
+    }
+   }
+  },
+  "two_way": {
+   "build_ok": true,
+   "files": {
+    "client.luau": {
+     "bytecode_bytes": 8114,
+     "chunk_heap_bytes": 16960,
+     "native_code_bytes": 52695,
+     "source_bytes": 11623,
+     "source_lines": 432
+    },
+    "server.luau": {
+     "bytecode_bytes": 16346,
+     "chunk_heap_bytes": 29038,
+     "native_code_bytes": 102607,
+     "source_bytes": 19462,
+     "source_lines": 662
+    }
+   }
+  }
+ }
+}

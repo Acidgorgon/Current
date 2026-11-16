@@ -14,7 +14,11 @@ It means lower bandwidth usage directly resulting in **lower ping\*** experience
 
 *\* In comparison to standard ROBLOX networking, this may not always be the case but should never result in increased ping times.*
 
-Benchmarks are available here [here](./benchmark/Benchmarks.md).
+Upstream Blink's Studio benchmarks are [here](./benchmark/Benchmarks.md).
+
+## blink-plus benchmarks
+
+`benchmark/harness/` compares blink-plus with upstream Blink, Zap, BlinkBlox and plain RemoteEvents (more libraries coming) on football-game traffic with 44 clients, measuring CPU (native and interpreted), exact allocations, module memory and wire bytes. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
 
 # Security
 Blink does two things to combat bad actors:

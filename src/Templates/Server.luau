@@ -139,12 +139,13 @@ Switch = function(Writer: Writer)
     CurrentPlayer = nil
     if Writer ~= Home then
         Private = true
-        CatchUp(Writer)
+        if Writer.Synced ~= Home.Cursor or Writer.SyncedInstances ~= #Home.Instances then
+            CatchUp(Writer)
+        end
     end
 end
 
 --> Cold path of a send to one player: their writer is not the loaded one.
---> Same as Switch, with the catch-up skipped when there is nothing new.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local UsePlayer
 UsePlayer = function(Player: Player)
@@ -155,14 +156,8 @@ UsePlayer = function(Player: Player)
             PlayersMap[Player] = nil
         end
     end
-    Save(Current)
-    Load(Writer :: Writer)
-    Current = Writer :: Writer
+    Switch(Writer)
     CurrentPlayer = Player
-    Private = true
-    if (Writer :: Writer).Synced ~= Home.Cursor or (Writer :: Writer).SyncedInstances ~= #Home.Instances then
-        CatchUp(Writer :: Writer)
-    end
 end
 
 --> FireExcept: catch the excluded player up to the log, then mark them as past the new event

@@ -242,8 +242,11 @@ function Generators.Event(State: State, Event: Parser.Event)
 		_, Values = GetTypescriptType(State, Value.Data)
 	end
 
+	local CanFire = (Value.From == State.Context or Value.From == "Both")
+	local CanListen = (Value.From ~= State.Context or Value.From == "Both")
+
 	local ListenerValues = Values
-	if Value.From == "Client" then
+	if State.Context == "Server" then
 		ListenerValues = `Player: Player, {Values}`
 	end
 
@@ -254,8 +257,8 @@ function Generators.Event(State: State, Event: Parser.Event)
 
 	StringBuilder.Push(`export {GetPrefix(Indent)}const {Name}: \{`, 0, Indent)
 
-	if Value.From == State.Context then
-		if Value.From == "Server" then
+	if CanFire then
+		if State.Context == "Server" then
 			StringBuilder.Push(`{Casing.Fire}: (Player: Player, {Values}) => void`, 0, Indent + 1)
 			StringBuilder.Push(`{Casing.FireAll}: ({Values}) => void`, 0, Indent + 1)
 			StringBuilder.Push(`{Casing.FireExcept}: (Except: Player, {Values}) => void`, 0, Indent + 1)
@@ -263,10 +266,14 @@ function Generators.Event(State: State, Event: Parser.Event)
 		else
 			StringBuilder.Push(`{Casing.Fire}: ({Values}) => void`, 0, Indent + 1)
 		end
-	elseif IsPolling then
-		StringBuilder.Push(`{Casing.Iter}: () => IterableFunction<{ListenerValues}>`, 0, Indent + 1)
-	else
-		StringBuilder.Push(`{Casing.On}: (Listener: ({ListenerValues}) => void) => (() => void)`, 0, Indent + 1)
+	end
+
+	if CanListen then
+		if IsPolling then
+			StringBuilder.Push(`{Casing.Iter}: () => IterableFunction<{ListenerValues}>`, 0, Indent + 1)
+		else
+			StringBuilder.Push(`{Casing.On}: (Listener: ({ListenerValues}) => void) => (() => void)`, 0, Indent + 1)
+		end
 	end
 
 	StringBuilder.Push(`\}`, 0, Indent)

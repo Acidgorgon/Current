@@ -18,7 +18,21 @@ event MyEvent {
 
 #### `From`
 Determines the side from which the event is fired. <br/>
-Currently Blink supports either `Server` or `Client`.
+* `Server` - fired by the server, listened to on clients.
+* `Client` - fired by clients, listened to on the server.
+* `Both` - a two-way event: one declaration that the server and clients can both fire and both listen to.
+  Each side gets the full sending API (`Fire`/`FireAll`/`FireList`/`FireExcept` on the server, `Fire` on the client)
+  and the listening API chosen by `Call`. Both directions share one event index, so a two-way event costs no more
+  than a one-way one.
+
+```blink copy
+event Ping {
+    From: Both,
+    Type: Reliable,
+    Call: ManyAsync,
+    Data: u32
+}
+```
 
 #### `Type`
 Determines the type (reliability) of the event.
@@ -92,6 +106,21 @@ end)
 local Disconnect = blink.MyEvent.On(...)
 Disconnect()
 ```
+
+### Two-way events
+With `From: Both` both files expose both halves:
+```lua filename="client.luau" copy
+blink.Ping.On(function(Value)
+    blink.Ping.Fire(Value) -- echo it back on the same event
+end)
+```
+```lua filename="server.luau" copy
+blink.Ping.On(function(Player, Value)
+    print(Player, "answered", Value)
+end)
+blink.Ping.FireAll(os.clock())
+```
+Data sent by clients is validated on the server exactly like a `From: Client` event.
 
 ### Iterating an Event (Polling)
 ```lua filename="client.luau" copy

@@ -66,6 +66,14 @@ Default: `false`
 Controls if Blink will replicate events and functions automatically at the end of every frame.  
 When set to `true` automatic replication will be disabled and a `StepReplication` function will be exposed instead.
 
+## `ReuseSendBuffers`
+Default: `false`
+
+When `true`, each writer keeps the exact-size buffer it last handed to a remote and reuses it when the next
+send has the same size, instead of allocating a new one. This removes almost all per-frame garbage from steady
+traffic (for example a fixed-size match state broadcast every frame). It relies on Roblox copying a buffer's
+contents when a remote is fired, which is how remotes serialize their arguments.
+
 ## `RemoteScope`
 Default: `""`
 

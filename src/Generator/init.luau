@@ -536,114 +536,46 @@ function Declarations.Event(Declaration: Parser.Event)
 		table.insert(NoopMembers, `{Casing.Next} = NOOP,\n`)
 	end
 
+	--> Fire functions are a prologue, the inlined serializer, and an epilogue.
+	--> Loops and remote calls live in shared helpers (see the templates) to keep code size down.
+	local function FireFunction(FunctionName: string, Parameters: string, Before: string?, After: string?)
+		local Fire = Blocks.Function(FunctionName, Parameters, "()", true)
+		if Before then
+			Fire:Line(Before)
+		end
+		Fire:Line(WriteEvent)
+		if After then
+			Fire:Line(After)
+		end
+		Fire:End()
+		table.insert(Members, Fire:Wrap("", ",").Content)
+		table.insert(NoopMembers, `{FunctionName} = NOOP,\n`)
+	end
+
 	if CanFire and Context == "Client" then
-		local Fire = Blocks.Function(Casing.Fire, Values, "()", true)
 		if IsReliable then
 			--> The reliable outbox is always loaded on the client
-			Fire:Line(WriteEvent)
+			FireFunction(Casing.Fire, Values)
 		else
-			Fire:Line("BeginScratch()")
-			Fire:Line(WriteEvent)
-			Fire:Line("Save(Scratch)")
-			Fire:Line("Unreliable:FireServer(Pack(Scratch), SendInstances)")
-			Fire:Line("EndScratch()")
+			FireFunction(Casing.Fire, Values, "BeginScratch()", "SendUnreliable()")
 		end
-		Fire:End()
-
-		table.insert(Members, Fire:Wrap("", ",").Content)
-		table.insert(NoopMembers, `{Casing.Fire} = NOOP,\n`)
 	elseif CanFire and Context == "Server" then
-		local Fire = Blocks.Function(Casing.Fire, `Player: Player, {Values}`, "()", true)
-		if IsReliable then
-			Fire:Line("local Writer = BeginPlayer(Player)")
-			Fire:Line(WriteEvent)
-			Fire:Line("EndPlayer(Writer)")
-		else
-			Fire:Line("BeginScratch()")
-			Fire:Line(WriteEvent)
-			Fire:Line("Save(Scratch)")
-			Fire:Line("Unreliable:FireClient(Player, Pack(Scratch), SendInstances)")
-			Fire:Line("EndScratch()")
-		end
-		Fire:End()
+		local PlayerValues = `Player: Player, {Values}`
+		local ListValues = `List: \{Player\}, {Values}`
+		local ExceptValues = `Except: Player, {Values}`
 
-		local FireAll = Blocks.Function(Casing.FireAll, Values, "()", true)
 		if IsReliable then
+			FireFunction(Casing.Fire, PlayerValues, "local Writer = BeginPlayer(Player)", "EndPlayer(Writer)")
 			--> The broadcast log is always loaded on the server
-			FireAll:Line(WriteEvent)
+			FireFunction(Casing.FireAll, Values)
+			FireFunction(Casing.FireList, ListValues, "BeginScratch()", "SendReliableList(List)")
+			FireFunction(Casing.FireExcept, ExceptValues, "local Writer = BeginExcept(Except)", "EndExcept(Writer)")
 		else
-			FireAll:Line("BeginScratch()")
-			FireAll:Line(WriteEvent)
-			FireAll:Line("Save(Scratch)")
-			FireAll:Line("Unreliable:FireAllClients(Pack(Scratch), SendInstances)")
-			FireAll:Line("EndScratch()")
+			FireFunction(Casing.Fire, PlayerValues, "BeginScratch()", "SendUnreliable(Player)")
+			FireFunction(Casing.FireAll, Values, "BeginScratch()", "SendUnreliableAll()")
+			FireFunction(Casing.FireList, ListValues, "BeginScratch()", "SendUnreliableList(List)")
+			FireFunction(Casing.FireExcept, ExceptValues, "BeginScratch()", "SendUnreliableExcept(Except)")
 		end
-		FireAll:End()
-
-		local FireList = Blocks.Function(Casing.FireList, `List: \{Player\}, {Values}`, "()", true)
-		if IsReliable then
-			FireList:Line("BeginScratch()")
-			FireList:Line(WriteEvent)
-			FireList:Line("Save(Scratch)")
-			FireList:Line("local Size, Source, Instances = SendCursor, SendBuffer, SendInstances")
-			FireList:Line("Load(Home)")
-			FireList:Iterator("_", "Player", "List")
-				:Line("local Writer = BeginPlayer(Player)")
-				:Line("local Position = Allocate(Size)")
-				:Line("buffer.copy(SendBuffer, Position, Source, 0, Size)")
-				:Compare("#Instances", "0", "Greater")
-				:Line("table.move(Instances, 1, #Instances, #SendInstances + 1, SendInstances)")
-				:End()
-				:Line("EndPlayer(Writer)")
-				:End()
-			FireList:Line("Scratch.Cursor = 0")
-			FireList:Line("table.clear(Instances)")
-		else
-			FireList:Line("BeginScratch()")
-			FireList:Line(WriteEvent)
-			FireList:Line("Save(Scratch)")
-			FireList:Line("local Buffer = Pack(Scratch)")
-			FireList:Iterator("_", "Player", "List"):Line("Unreliable:FireClient(Player, Buffer, SendInstances)"):End()
-			FireList:Line("EndScratch()")
-		end
-		FireList:End()
-
-		local FireExcept = Blocks.Function(Casing.FireExcept, `Except: Player, {Values}`, "()", true)
-		if IsReliable then
-			--> Catch the excluded player up to the log, write once, then mark them as past this event
-			FireExcept:Line("local Writer = PlayersMap[Except]")
-			FireExcept:Compare("Writer", "nil", "Not")
-				:Line("Writer = BeginPlayer(Except)")
-				:Line("EndPlayer(Writer)")
-				:End()
-			FireExcept:Line(WriteEvent)
-			FireExcept:Compare("Writer", "nil", "Not")
-				:Line("Writer.Synced = SendCursor")
-				:Line("Writer.SyncedInstances = #SendInstances")
-				:End()
-		else
-			FireExcept:Line("BeginScratch()")
-			FireExcept:Line(WriteEvent)
-			FireExcept:Line("Save(Scratch)")
-			FireExcept:Line("local Buffer = Pack(Scratch)")
-			FireExcept:Iterator("_", "Player", "Players:GetPlayers()")
-				:Compare("Player", "Except", "Equals")
-				:Line("continue")
-				:End()
-				:Line("Unreliable:FireClient(Player, Buffer, SendInstances)")
-				:End()
-			FireExcept:Line("EndScratch()")
-		end
-		FireExcept:End()
-
-		table.insert(Members, Fire:Wrap("", ",").Content)
-		table.insert(Members, FireAll:Wrap("", ",").Content)
-		table.insert(Members, FireList:Wrap("", ",").Content)
-		table.insert(Members, FireExcept:Wrap("", ",").Content)
-		table.insert(NoopMembers, `{Casing.Fire} = NOOP,\n`)
-		table.insert(NoopMembers, `{Casing.FireAll} = NOOP,\n`)
-		table.insert(NoopMembers, `{Casing.FireList} = NOOP,\n`)
-		table.insert(NoopMembers, `{Casing.FireExcept} = NOOP,\n`)
 	end
 
 	for _, Member in Members do

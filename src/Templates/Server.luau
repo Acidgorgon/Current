@@ -75,6 +75,78 @@ local function EndPlayer(Writer: Writer)
     Load(Home)
 end
 
+--> FireExcept: catch the excluded player up to the log, then mark them as past the new event
+local function BeginExcept(Except: Player): Writer?
+    local Writer = PlayersMap[Except]
+    if Writer ~= nil then
+        Save(Home)
+        Load(Writer)
+        CatchUp(Writer)
+        Save(Writer)
+        Load(Home)
+    end
+    return Writer
+end
+
+local function EndExcept(Writer: Writer?)
+    if Writer ~= nil then
+        Writer.Synced = SendCursor
+        Writer.SyncedInstances = #SendInstances
+    end
+end
+
+--> FireList (reliable): the event was serialized once into Scratch, append it to each player
+local function SendReliableList(List: {Player})
+    Save(Scratch)
+    local Size, Source, Instances = SendCursor, SendBuffer, SendInstances
+    local InstanceCount = #Instances
+    Load(Home)
+    for _, Player in List do
+        local Writer = BeginPlayer(Player)
+        local Position = Allocate(Size)
+        buffer.copy(SendBuffer, Position, Source, 0, Size)
+        if InstanceCount > 0 then
+            table.move(Instances, 1, InstanceCount, #SendInstances + 1, SendInstances)
+        end
+        EndPlayer(Writer)
+    end
+    Scratch.Cursor = 0
+    table.clear(Instances)
+end
+
+--> Unreliable sends: the event was serialized into Scratch
+local function SendUnreliable(Player: Player)
+    Save(Scratch)
+    Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
+    EndScratch()
+end
+
+local function SendUnreliableAll()
+    Save(Scratch)
+    Unreliable:FireAllClients(Pack(Scratch), SendInstances)
+    EndScratch()
+end
+
+local function SendUnreliableList(List: {Player})
+    Save(Scratch)
+    local Buffer = Pack(Scratch)
+    for _, Player in List do
+        Unreliable:FireClient(Player, Buffer, SendInstances)
+    end
+    EndScratch()
+end
+
+local function SendUnreliableExcept(Except: Player)
+    Save(Scratch)
+    local Buffer = Pack(Scratch)
+    for _, Player in Players:GetPlayers() do
+        if Player ~= Except then
+            Unreliable:FireClient(Player, Buffer, SendInstances)
+        end
+    end
+    EndScratch()
+end
+
 for _, Player in Players:GetPlayers() do
     if PlayersMap[Player] == nil then
         CreateWriter(Player, 0, 0)

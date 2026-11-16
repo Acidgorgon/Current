@@ -441,6 +441,8 @@ function Declarations.Event(Declaration: Parser.Event)
 		if Value.Data then
 			--> The read function's body without its header, return and end
 			assert(string.find(Read[#Read - 1], "^%s*return ") and string.find(Read[#Read], "^end"), "unexpected read body")
+			--> A local lets native code keep the buffer in a register across the reads
+			Handler:Line("local RecieveBuffer = RecieveBuffer")
 			Handler:Lines(table.move(Read, 2, #Read - 2, 1, {}), 0)
 		else
 			Handler:Line("local Value = nil")

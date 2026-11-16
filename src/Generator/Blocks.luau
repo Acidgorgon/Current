@@ -83,6 +83,12 @@ function Block._operation(self: Block, Method: Method, Bytes: number): string
 	Operation.Bytes += Bytes
 	Operation.Method = Method
 
+	--> Array items: reads use constant offsets from the item's start, which End() advances
+	--> once per item (one add per item instead of one per read)
+	if self.Unique ~= DEFAULT_UNIQUE and Method == "Read" then
+		return `{self.Unique} + {Offset}`
+	end
+
 	if self.Unique ~= DEFAULT_UNIQUE then
 		self:Comment(`{Method} {Bytes}`)
 		local OperationOffset = `OPERATION_OFFSET_{self.OperationOffset}`
@@ -261,6 +267,11 @@ end
 
 function Block.End(self: Block): Block
 	self:_appendOperations()
+
+	local Operation = self.Operation
+	if self.Unique ~= DEFAULT_UNIQUE and Operation.Method == "Read" and not self.Unsafe then
+		self:Line(`{self.Unique} += {Operation.Bytes}`)
+	end
 
 	local Parent = self.Parent
 	if Parent then

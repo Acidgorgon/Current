@@ -14,14 +14,11 @@ local function StepReplication()
         return
     end
 
-    local Buffer = buffer.create(SendCursor)
-    buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-    Reliable:FireServer(Buffer, SendInstances)
+    Save(Home)
+    Reliable:FireServer(Pack(Home), SendInstances)
 
-    SendSize = 64
-    SendCursor = 0
-    SendOffset = 0
-    SendBuffer = buffer.create(64)
-    table.clear(SendInstances)
+    Home.Cursor = 0
+    table.clear(Home.Instances)
+    Load(Home)
 end
 ]]

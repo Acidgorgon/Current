@@ -439,8 +439,31 @@ function Declarations.Enum(Declaration: Parser.Enum, Read: Blocks.Block, Write: 
 	if #Enums > ENUM_TABLE_THRESHOLD then
 		local ReadTable, WriteTable = GetEnumTables(Enums)
 		Types.u8.Read(`Index`, Read)
-		Read:Line(`{Read:Declare(Variable)} = {ReadTable}[Index + 1] :: any`)
-		Read:Compare(Variable, "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+
+		--> Inside a loop, the lookup table is fetched once into a local at the top of the function
+		local Root, InLoop = Read, false
+		while Root.Parent do
+			InLoop = InLoop or Root.Unique ~= "BLOCK_START"
+			Root = Root.Parent
+		end
+		if InLoop then
+			local Local = string.gsub(ReadTable, "EnumTables%[(%d+)%]", "EnumRead_%1")
+			if not Root.Variables[Local] then
+				Root.Variables[Local] = true
+				Root:_lineFront(`local {Local} = {ReadTable}`)
+			end
+			ReadTable = Local
+		end
+
+		if IsFieldAccess(Variable) then
+			--> Checked in a local, so the field is written once and not read back
+			Read:Line(`{Read:Declare("EnumValue")} = {ReadTable}[Index + 1]`)
+			Read:Compare("EnumValue", "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+			Read:Line(`{Variable} = EnumValue :: any`)
+		else
+			Read:Line(`{Read:Declare(Variable)} = {ReadTable}[Index + 1] :: any`)
+			Read:Compare(Variable, "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+		end
 
 		Write:Line(`{Write:Declare("EnumIndex")} = {WriteTable}[{Variable}]`)
 		Write:Compare("EnumIndex", "nil", "Equals")
@@ -450,8 +473,10 @@ function Declarations.Enum(Declaration: Parser.Enum, Read: Blocks.Block, Write: 
 		return
 	end
 
-	--> Read body
-	Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	--> Read body (a field needs no placeholder: every branch assigns it or errors)
+	if not IsFieldAccess(Variable) then
+		Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	end
 	Types.u8.Read(`Index`, Read)
 	Read = Read:Compare("Index", "0", "Equals")
 	for Index, EnumItem in Enums do

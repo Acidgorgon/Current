@@ -86,6 +86,113 @@ local IndexBytes = 1
 local Generators = {}
 local Declarations = {}
 
+--> Fire method factories, emitted only when used. Each takes an event's serializer and
+--> returns the method, so every event shares these few prototypes. The "1" variants
+--> skip vararg forwarding for single-value events on the hot reliable paths.
+local FIRE_FACTORY_ORDER = {
+	"ReliableFire1", "ReliableFire", "ReliableFireAll1", "ReliableFireAll", "ReliableFireList",
+	"ReliableFireExcept", "UnreliableFire", "UnreliableFireAll", "UnreliableFireList", "UnreliableFireExcept",
+}
+local FIRE_FACTORIES = {
+	Server = {
+		ReliableFire1 = [[local function ReliableFire1(Write: (any) -> ()): any
+    return function(Player: Player, Value: any)
+        if PlayersMap[Player] ~= Current then
+            UsePlayer(Player)
+        end
+        Write(Value)
+    end
+end
+]],
+		ReliableFire = [[local function ReliableFire(Write: (...any) -> ()): any
+    return function(Player: Player, ...)
+        if PlayersMap[Player] ~= Current then
+            UsePlayer(Player)
+        end
+        Write(...)
+    end
+end
+]],
+		ReliableFireAll1 = [[local function ReliableFireAll1(Write: (any) -> ()): any
+    return function(Value: any)
+        if Current ~= Home then
+            Switch(Home)
+        end
+        Write(Value)
+    end
+end
+]],
+		ReliableFireAll = [[local function ReliableFireAll(Write: (...any) -> ()): any
+    return function(...)
+        if Current ~= Home then
+            Switch(Home)
+        end
+        Write(...)
+    end
+end
+]],
+		ReliableFireList = [[local function ReliableFireList(Write: (...any) -> ()): any
+    return function(List: {Player}, ...)
+        BeginScratch()
+        Write(...)
+        SendReliableList(List)
+    end
+end
+]],
+		ReliableFireExcept = [[local function ReliableFireExcept(Write: (...any) -> ()): any
+    return function(Except: Player, ...)
+        local Writer = BeginExcept(Except)
+        Write(...)
+        EndExcept(Writer)
+    end
+end
+]],
+		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> ()): any
+    return function(Player: Player, ...)
+        BeginScratch()
+        Write(...)
+        SendUnreliable(Player)
+    end
+end
+]],
+		UnreliableFireAll = [[local function UnreliableFireAll(Write: (...any) -> ()): any
+    return function(...)
+        BeginScratch()
+        Write(...)
+        SendUnreliableAll()
+    end
+end
+]],
+		UnreliableFireList = [[local function UnreliableFireList(Write: (...any) -> ()): any
+    return function(List: {Player}, ...)
+        BeginScratch()
+        Write(...)
+        SendUnreliableList(List)
+    end
+end
+]],
+		UnreliableFireExcept = [[local function UnreliableFireExcept(Write: (...any) -> ()): any
+    return function(Except: Player, ...)
+        BeginScratch()
+        Write(...)
+        SendUnreliableExcept(Except)
+    end
+end
+]],
+	},
+	Client = {
+		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> ()): any
+    return function(...)
+        BeginScratch()
+        Write(...)
+        SendUnreliable()
+    end
+end
+]],
+	},
+}
+local UsedFactories: { [string]: boolean } = {}
+
 local Channels: { [string]: { Count: number, Listening: boolean } } = {
 	Reliable = { Count = 0, Listening = false },
 	Unreliable = { Count = 0, Listening = false },
@@ -396,7 +503,6 @@ function Declarations.Event(Declaration: Parser.Event)
 	--> Return body
 	local Body = Builder.new()
 	local Indent = Util.GetScopeIndent(Scope)
-	local WriteEvent = `{Util.GetPath(Identifier, true, Scope)}({Arguments})`
 	local ReadEvent = `{Util.GetPath(Identifier, false, Scope)}()`
 	local PlayerParameter = Context == "Server" and "Player: Player" or ""
 	local PlayerArgument = Context == "Server" and "Player, " or ""
@@ -525,28 +631,26 @@ function Declarations.Event(Declaration: Parser.Event)
 		table.insert(NoopMembers, `{Casing.Next} = NOOP,\n`)
 	end
 
-	--> Fire functions are a prologue, the inlined serializer, and an epilogue.
-	--> Loops and remote calls live in shared helpers (see the templates) to keep code size down.
-	local function FireFunction(FunctionName: string, Parameters: string, Before: string?, After: string?)
-		local Fire = Blocks.Function(FunctionName, Parameters, "()", true)
-		if Before then
-			Fire:Line(Before)
+	--> Fire functions are closures over the event's serializer, made by shared factories
+	--> (see FIRE_FACTORIES): no function prototype per event and fire method.
+	local Writer = Util.GetPath(Identifier, true, Scope)
+	local IsSingleValue = (string.find(Arguments, ",", 1, true) == nil)
+	local function FireFunction(FunctionName: string, Parameters: string, Factory: string?)
+		local Expression = Writer
+		if Factory then
+			UsedFactories[Factory] = true
+			Expression = `{Factory}({Writer})`
 		end
-		Fire:Line(WriteEvent)
-		if After then
-			Fire:Line(After)
-		end
-		Fire:End()
-		table.insert(Members, Fire:Wrap("", ",").Content)
+		table.insert(Members, { `{FunctionName} = {Expression} :: ({Parameters}) -> (),\n` })
 		table.insert(NoopMembers, `{FunctionName} = NOOP,\n`)
 	end
 
 	if CanFire and Context == "Client" then
 		if IsReliable then
-			--> The reliable outbox is always loaded on the client
+			--> The reliable outbox is always loaded on the client: Fire is the serializer itself
 			FireFunction(Casing.Fire, Values)
 		else
-			FireFunction(Casing.Fire, Values, "BeginScratch()", "SendUnreliable()")
+			FireFunction(Casing.Fire, Values, "UnreliableFire")
 		end
 	elseif CanFire and Context == "Server" then
 		local PlayerValues = `Player: Player, {Values}`
@@ -554,16 +658,15 @@ function Declarations.Event(Declaration: Parser.Event)
 		local ExceptValues = `Except: Player, {Values}`
 
 		if IsReliable then
-			--> The last writer sent to stays loaded, so repeated sends to one player or to all skip the switch
-			FireFunction(Casing.Fire, PlayerValues, "if PlayersMap[Player] ~= Current then UsePlayer(Player) end")
-			FireFunction(Casing.FireAll, Values, "if Current ~= Home then Switch(Home) end")
-			FireFunction(Casing.FireList, ListValues, "BeginScratch()", "SendReliableList(List)")
-			FireFunction(Casing.FireExcept, ExceptValues, "local Writer = BeginExcept(Except)", "EndExcept(Writer)")
+			FireFunction(Casing.Fire, PlayerValues, IsSingleValue and "ReliableFire1" or "ReliableFire")
+			FireFunction(Casing.FireAll, Values, IsSingleValue and "ReliableFireAll1" or "ReliableFireAll")
+			FireFunction(Casing.FireList, ListValues, "ReliableFireList")
+			FireFunction(Casing.FireExcept, ExceptValues, "ReliableFireExcept")
 		else
-			FireFunction(Casing.Fire, PlayerValues, "BeginScratch()", "SendUnreliable(Player)")
-			FireFunction(Casing.FireAll, Values, "BeginScratch()", "SendUnreliableAll()")
-			FireFunction(Casing.FireList, ListValues, "BeginScratch()", "SendUnreliableList(List)")
-			FireFunction(Casing.FireExcept, ExceptValues, "BeginScratch()", "SendUnreliableExcept(Except)")
+			FireFunction(Casing.Fire, PlayerValues, "UnreliableFire")
+			FireFunction(Casing.FireAll, Values, "UnreliableFireAll")
+			FireFunction(Casing.FireList, ListValues, "UnreliableFireList")
+			FireFunction(Casing.FireExcept, ExceptValues, "UnreliableFireExcept")
 		end
 	end
 
@@ -1201,6 +1304,7 @@ function Generator.Reset()
 	Constants = Builder.new()
 	EnumTables = {}
 	EnumTableCount = 0
+	UsedFactories = {}
 	IndexType = "u8"
 	IndexBytes = 1
 
@@ -1282,6 +1386,13 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		table.insert(Connections, `end)\n`)
 	end
 
+	local Factories = {}
+	for _, Name in FIRE_FACTORY_ORDER do
+		if UsedFactories[Name] then
+			table.insert(Factories, FIRE_FACTORIES[Context][Name])
+		end
+	end
+
 	Noop.Push(`\})`, 0, 1)
 	Noop.Push(`return Returns :: {EVENTS_TYPE}`, 0, 1)
 	Noop.Push(`end`, 0, 0)
@@ -1322,6 +1433,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		Replication.DumpLines(),
 		HandlerLines.DumpLines(),
 		Connections,
+		Factories,
 		Return.DumpLines(),
 		{ `type {EVENTS_TYPE} = typeof(Returns)\n`, `return Returns :: {EVENTS_TYPE}` }
 	)

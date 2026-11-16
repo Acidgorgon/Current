@@ -19,7 +19,7 @@ Output paths come from the [`ServerOutput`, `ClientOutput` and `TypesOutput` opt
 | Flag | Description |
 |---|---|
 | `-h`, `--help` | Print usage and the list of options. |
-| `-v`, `--version` | Print the version (`Current 0.1.0`) and exit. |
+| `-v`, `--version` | Print the version (`Current 0.1.1`) and exit. |
 | `-w`, `--watch` | Watch the schema and every file it imports (and their imports) and recompile whenever one changes. |
 | `-y`, `--yes` | Accept every prompt, such as creating an output folder that does not exist. Use it in scripts and CI. |
 | `-q`, `--quiet` | Print nothing but errors. |

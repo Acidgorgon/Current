@@ -9,7 +9,7 @@ Current is a drop-in replacement for [Blink](https://github.com/1Axen/blink) 0.1
    ```toml [rokit.toml]
    [tools]
    # blink = "1Axen/blink@0.18.9"
-   current = "Acidgorgon/current@0.1.0"
+   current = "Acidgorgon/current@0.1.1"
    ```
 
 2. **Call `current` instead of `blink`.** Arguments are the same, so `blink net --watch` becomes `current net --watch`. Update any scripts that call the compiler (dev scripts, CI, Makefiles).

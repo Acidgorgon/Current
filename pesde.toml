@@ -8,7 +8,7 @@ includes = [
 license = "MIT"
 name = "acidgorgon/current"
 repository = "https://github.com/Acidgorgon/current"
-version = "0.1.0"
+version = "0.1.1"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"

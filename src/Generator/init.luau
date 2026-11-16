@@ -197,6 +197,7 @@ local UsedFactories: { [string]: boolean } = {}
 --> sends the server keeps no per-player writers and StepReplication has nothing to do.
 local SendsReliable = false
 local RELIABLE_MARKER = "-- RELIABLE --\n"
+local ENUM_TABLES_MARKER = "-- ENUM TABLES --\n"
 
 local Channels: { [string]: { Count: number, Listening: boolean } } = {
 	Reliable = { Count = 0, Listening = false },
@@ -1525,8 +1526,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		(if Options.SyncValidation then SYNC_VALIDATION_BODY else {}),
 		Events.DumpLines(),
 		LuauTypes.DumpLines(),
-		{ "local EnumTables = {}\n" },
-		Constants.DumpLines(),
+		{ "local EnumTables = {}\n", ENUM_TABLES_MARKER },
 		UserTypes.DumpLines(),
 		Noop.DumpLines(),
 		string.split(Runtime, "\r"),
@@ -1538,7 +1538,19 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		{ `type {EVENTS_TYPE} = typeof(Returns)\n`, `return Returns :: {EVENTS_TYPE}` }
 	)
 
-	return Shake(table.concat(MergedOutput))
+	--> Enum lookup tables are made for both directions; keep only the ones this side uses
+	local Output = table.concat(MergedOutput)
+	local Used = {}
+	for _, Line in Constants.DumpLines() do
+		local Reference = string.match(Line, "^%s*(EnumTables%[%d+%])")
+		if Reference == nil or string.find(Output, Reference, 1, true) then
+			table.insert(Used, Line)
+		end
+	end
+	local MarkerStart, MarkerEnd = string.find(Output, ENUM_TABLES_MARKER, 1, true)
+	Output = string.sub(Output, 1, (MarkerStart :: number) - 1) .. table.concat(Used) .. string.sub(Output, (MarkerEnd :: number) + 1)
+
+	return Shake(Output)
 end
 
 function Generator.GenerateShared(AbstractSyntaxTree: Parser.Body): string

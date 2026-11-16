@@ -1,47 +1,74 @@
-<div align="center">
-  <img src="./docs/public/Logo.png" class="center">
-</div>
+# Current
 
-[![GitHub License](https://img.shields.io/github/license/1Axen/blink?style=flat-square&color=%23a350af)](LICENSE)
-[![GitHub Release](https://img.shields.io/github/v/release/1Axen/blink?style=flat-square&color=%23a350af)](https://github.com/1Axen/blink/releases/latest)
+[![GitHub License](https://img.shields.io/github/license/Acidgorgon/current?style=flat-square&color=%23a350af)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/Acidgorgon/current?style=flat-square&color=%23a350af)](https://github.com/Acidgorgon/current/releases/latest)
 
-An IDL compiler written in Luau for ROBLOX buffer networking
+A faster Roblox networking IDL compiler with two-way events, forked from [Blink](https://github.com/1Axen/blink).
 
-blink-plus is a fork of [Blink](https://github.com/1Axen/blink) by 1Axen.
+You describe your events, functions and types in a schema file, and Current generates typed server and client Luau modules (and optional TypeScript definitions) that batch everything into buffers. Current reads Blink's schema language, so existing `.blink` files compile unchanged.
+
+What Current adds on top of Blink:
+
+- **Two-way events.** `From: Both` declares one event that the server and clients can both fire and both listen to, sharing one event index:
+
+  ```
+  event Ping {
+      From: Both,
+      Type: Reliable,
+      Call: ManyAsync,
+      Data: u32
+  }
+  ```
+
+  Data sent by clients is validated on the server exactly like a `From: Client` event. See [Events](./docs/pages/language/5-events.mdx).
+- **Faster generated code.** In the benchmark harness Current is the fastest of the nine serializing libraries tested in every scenario, and 2.5x faster than upstream Blink 0.18.9 on a 44-player match snapshot and 3.1x on 120 events per frame. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
 
 # Install
-With [rokit](https://github.com/rojo-rbx/rokit), add this line under `[tools]` in your `rokit.toml` (or run `rokit add Acidgorgon/blink-plus blink`):
+
+With [rokit](https://github.com/rojo-rbx/rokit), run `rokit add Acidgorgon/current`, or add this line under `[tools]` in your `rokit.toml`:
 
 ```toml
-blink = "Acidgorgon/blink-plus@0.19.0"
+current = "Acidgorgon/current@0.1.0"
 ```
 
-Or download the archive for your platform from the [Releases](https://github.com/Acidgorgon/blink-plus/releases) page, extract it and put the `blink` executable on your `PATH`. The Studio plugin is attached to each release as `blink-plugin.rbxm`.
+Or download the archive for your platform from the [Releases](https://github.com/Acidgorgon/current/releases) page, extract it and put the `current` executable (`current.exe` on Windows) on your `PATH`.
 
-blink-plus is a drop-in replacement for the `blink` CLI: the executable has the same name, it takes the same arguments and the same schema language, and it adds `From: Both` events. Run it the same way, e.g. `blink events.blink`.
+Then compile a schema:
+
+```sh
+current events
+```
+
+This looks for `events`, `events.txt`, `events.blink` or `events.current` in the current directory. Run `current --help` for the options, including `--watch`.
+
+## Studio plugin
+
+The Studio plugin lets you write schemas and generate modules inside Roblox Studio. Download `current-plugin.rbxm` from the [Releases](https://github.com/Acidgorgon/current/releases) page and put it in your Studio plugins folder. It shows up in the Plugins tab as **Current**.
 
 # Performance
-Blink aims to generate the most performant and bandwidth-efficient code for your specific experience, but what does this mean?  
+Current, like Blink, aims to generate the most performant and bandwidth-efficient code for your specific experience, but what does this mean?
 
 It means lower bandwidth usage directly resulting in **lower ping\*** experienced by players and secondly, it means **lower CPU usage** compared to more generalized networking solutions.
 
 *\* In comparison to standard ROBLOX networking, this may not always be the case but should never result in increased ping times.*
 
+## Benchmarks
+
+`benchmark/harness/` compares Current with upstream Blink, BlinkBlox, Zap, ByteNet, QuickNet, Packet, Warp, Lync and plain RemoteEvents on football-game traffic with 44 clients, measuring CPU (native and interpreted), exact allocations, module memory and wire bytes. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
+
 Upstream Blink's Studio benchmarks are [here](./benchmark/Benchmarks.md).
 
-## blink-plus benchmarks
-
-`benchmark/harness/` compares blink-plus with upstream Blink, BlinkBlox, Zap, ByteNet, QuickNet, Packet, Warp, Lync and plain RemoteEvents on football-game traffic with 44 clients, measuring CPU (native and interpreted), exact allocations, module memory and wire bytes. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
-
 # Security
-Blink does two things to combat bad actors:
-1. Data sent by clients will be **validated** on the receiving side before  reaching any critical game code.
-2. As a result of the compression done by Blink it becomes **significantly harder** to snoop on your game's network traffic. Long gone are the days of skids using RemoteSpy to snoop on your game's traffic.
+Current does two things to combat bad actors:
+1. Data sent by clients will be **validated** on the receiving side before reaching any critical game code.
+2. As a result of the compression done by Current it becomes **significantly harder** to snoop on your game's network traffic. Long gone are the days of skids using RemoteSpy to snoop on your game's traffic.
 
 # Get Started
-Head over to the [installation](https://1axen.github.io/blink/getting-started/1-installation) page to get started with Blink.
+The documentation lives in [docs/pages](./docs/pages): start with [installation](./docs/pages/getting-started/1-installation.mdx), then the [introduction](./docs/pages/getting-started/2-introduction.mdx) and the [language reference](./docs/pages/language/1-options.mdx).
 
 # Credits
+Current is a fork of [Blink](https://github.com/1Axen/blink) by [1Axen](https://github.com/1Axen), under the MIT license (see [LICENSE](LICENSE)). The compiler, schema language, Studio plugin and documentation all come from Blink.
+
 Credits to [Zap](https://zap.redblox.dev/) for the range and array syntax  
 Credits to [ArvidSilverlock](https://github.com/ArvidSilverlock) for the float16 implementation  
 Studio plugin auto completion icons are sourced from [Microsoft](https://github.com/microsoft/vscode-icons) and are under the [CC BY 4.0](https://github.com/microsoft/vscode-icons/blob/main/LICENSE) license.  

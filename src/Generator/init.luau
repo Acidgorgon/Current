@@ -287,7 +287,12 @@ function Declarations.Set(Declaration: Parser.Set, Read: Blocks.Block, Write: Bl
 	do
 		--> Read Flags
 
-		Read:Line(`{Read:Declare(Variable)} = \{\}`)
+		--> A constant constructor: one allocation, keys pre-sized; every flag is overwritten
+		local Template = {}
+		for _, Flag in Flags do
+			table.insert(Template, `{FormatKey(Flag)} = false`)
+		end
+		Read:Line(`{Read:Declare(Variable)} = \{{table.concat(Template, ", ")}\}`)
 
 		local Remaining = #Flags
 		local FlagIndex = 1
@@ -413,14 +418,24 @@ function Declarations.Map(Declaration: Parser.Map, Read: Blocks.Block, Write: Bl
 	Write:Line(`buffer.writeu16(SendBuffer, {ElementsAllocation}, {ElementsVariable})`)
 end
 
-function Declarations.Struct(Declaration: Parser.Struct, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Struct(
+	Declaration: Parser.Struct,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	TagKey: string?
+)
 	local Value = Declaration.Value
 
 	--> Constant-valued constructor compiles to DUPTABLE: one allocation, keys pre-sized.
-	--> Every placeholder is overwritten by the field reads below.
+	--> Every placeholder is overwritten by the field reads below (a tagged enum variant's
+	--> tag field by the enum).
 	local Template = {}
 	for _, Field in Value.Values do
 		table.insert(Template, `{FormatKey(Field.Name)} = false`)
+	end
+	if TagKey then
+		table.insert(Template, `{FormatKey(TagKey)} = false`)
 	end
 	Read:Line(`{Read:Declare(Variable)} = \{{table.concat(Template, ", ")}\} :: any`)
 
@@ -465,7 +480,7 @@ function Declarations.TagEnum(Declaration: Parser.TagEnum, Read: Blocks.Block, W
 		Write:_lineFront(`buffer.writeu8(SendBuffer, {Allocation}, {Index - 1})`)
 		Write:Advance(1)
 
-		Generators.UserType(Variant, Read, Write, Variable)
+		Declarations.Struct(Variant, Read, Write, Variable, Tag)
 		Read:Line(`{TagIndex} = {Name}`)
 	end
 
@@ -932,8 +947,15 @@ function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write
 		Read:Line(`local Length = {Upper}`)
 	end
 
-	--> Array
-	Read:Line(`{Read:Declare(Variable)} = table.create(Length)`)
+	--> Array: a struct field is aliased by a local so the item stores do not index the struct again
+	local ArrayVariable = Variable
+	if string.find(Variable, "[%.%[]") then
+		ArrayVariable = `Array_{Read.Indent}`
+		Read:Line(`{Read:Declare(ArrayVariable)} = table.create(Length)`)
+		Read:Line(`{Variable} = {ArrayVariable}`)
+	else
+		Read:Line(`{Read:Declare(Variable)} = table.create(Length)`)
+	end
 
 	--> Body
 	local ReadCounter = `Index_{Read.Indent}`
@@ -944,7 +966,7 @@ function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write
 	Write:Line(`local {Iterator} = {Variable}[{WriteCounter}]`)
 	Generators.UserType(Of, Read, Write, Iterator)
 
-	Read:Line(`{Variable}[{ReadCounter}] = {Iterator}`)
+	Read:Line(`{ArrayVariable}[{ReadCounter}] = {Iterator}`)
 
 	--> End
 	Read = Read:End()

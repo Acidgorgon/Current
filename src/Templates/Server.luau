@@ -126,18 +126,24 @@ Switch = function(Writer: Writer)
     end
 end
 
---> Cold path of a send to one player: their writer is not the loaded one.
+--> Cold path of a send to one player: their writer (Writer, nil if they have none yet)
+--> is not the loaded one. Same as Switch, with the catch-up skipped when there is nothing new.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local UsePlayer
-UsePlayer = function(Player: Player)
-    local Writer = PlayersMap[Player]
+UsePlayer = function(Player: Player, Writer: Writer?)
     if Writer == nil then
         Writer = CreateWriter(Player, 0, 0)
         if Departed[Player] then
             PlayersMap[Player] = nil
         end
     end
-    Switch(Writer)
+    Save(Current)
+    Load(Writer :: Writer)
+    Current = Writer :: Writer
+    Private = true
+    if (Writer :: Writer).Synced ~= Home.Cursor or (Writer :: Writer).SyncedInstances ~= #Home.Instances then
+        CatchUp(Writer :: Writer)
+    end
 end
 
 --> FireExcept: catch the excluded player up to the log, then mark them as past the new event
@@ -172,8 +178,9 @@ SendReliableList = function(List: {Player})
     local InstanceCount = #Instances
     Load(Current)
     for _, Player in List do
-        if PlayersMap[Player] ~= Current then
-            UsePlayer(Player)
+        local Writer = PlayersMap[Player]
+        if Writer ~= Current then
+            UsePlayer(Player, Writer)
         end
         local Position = Allocate(Size)
         buffer.copy(SendBuffer, Position, Source, 0, Size)

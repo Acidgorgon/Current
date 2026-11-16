@@ -2,7 +2,7 @@ return [[local Invocations = 0
 
 --> Send state. The Send* upvalues are the "loaded" writer that the generated
 --> serializers write into. A Writer record holds a writer's state while it is
---> not loaded. Load/Save copy fields in and out and never allocate.
+--> not loaded. Loading and saving a writer copy its fields in and out and never allocate.
 --> Home is the reliable outbox on the client and the broadcast log shared by
 --> every player on the server. Current is the writer whose state is in the
 --> Send* upvalues: always Home on the client; on the server the writer of the
@@ -88,7 +88,7 @@ local function Invoke()
     return Invocation
 end
 
---> Cold path of Allocate: grows the loaded writer geometrically so it can hold InUse bytes.
+--> Cold path of the allocator below: grows the loaded writer geometrically to hold InUse bytes.
 --> Writers keep their capacity between frames.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local Grow

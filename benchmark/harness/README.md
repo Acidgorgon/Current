@@ -25,6 +25,10 @@ with a Roblox mock, in both interpreter (`-O2`) and native codegen mode.
 ./run.sh --variant stock=blink:$HOME/src/blink-stock \
          --variant current=blink:../..
 
+# the same source with an adapter flag: Current with ReuseReceiveTables on
+./run.sh --variant current=blink:../.. \
+         --variant current-reuse=blink+reuse:../..
+
 # markdown comparison (ratios baseline/candidate, > 1 = candidate better)
 python3 compare.py results/stock.json results/current.json [--mode interp|native|both]
 ```
@@ -32,7 +36,9 @@ python3 compare.py results/stock.json results/current.json [--mode interp|native
 Options: `--runs 7` (median is reported), `--frames 600` (multiplied per
 scenario by `frames_scale` in `scenarios/manifest.json`), `--warmup 120`,
 `--scenarios a,b`, `--modes interp,native`, `--cpu N` (taskset pin; `-1` off),
-`--adapter NAME` (single-variant form).
+`--adapter NAME` (single-variant form). A variant is
+`LABEL=ADAPTER[+FLAG...]:SOURCE`; see [Adapter interface](#adapter-interface)
+for flags.
 
 Requirements: cmake + a C++17 compiler (the host builds itself on first run),
 python3, `lune` (for the Blink compiler) and `luau-compile`, either on `PATH`
@@ -211,7 +217,7 @@ does not), `tick` and `time` are real globals.
 
 | adapter | source dir | what it does |
 |---|---|---|
-| `blink` | Blink checkout | `.blink` schemas in `adapters/blink/schemas/`, compiled with `lune run init` from `src/CLI`. The reference definitions. |
+| `blink` | Blink checkout | `.blink` schemas in `adapters/blink/schemas/`, compiled with `lune run init` from `src/CLI`. The reference definitions. When the compiler is Current, `build.sh` turns its per-second limits off (below); flag `reuse` (`blink+reuse`) adds `option ReuseReceiveTables = true`. |
 | `zap` | Zap checkout with `target/release/zap` (or a dir holding `zap`) | `.zap` schemas in `adapters/zap/schemas/`, compiled with the Zap CLI. Single* events expose `SetCallback`, Many* events `On`; both are handed out directly. |
 | `blinkblox` | BlinkBlox checkout | the Blink schemas with BlinkBlox's inbound limits raised (below), compiled from source with `lune run init` from `src/CLI`. Same public API as Blink. |
 | `bytenet` | ByteNet 0.4.x release (v0.4.3; `main` is an unfinished rewrite and is refused) | packets defined in `adapters/bytenet/schemas/<schema>.luau`. Enums and sets are custom `{read, write}` types (u8 index / u8 bitfield). |
@@ -242,6 +248,19 @@ clients so their code heap is measured separately.
 Schema differences that affect wire size or work (everything else matches
 Blink's types, ranges, enums, `Type` and `Call` exactly):
 
+* **blink (Current)**: identical schemas. When the source compiler supports
+  them (`build.sh` looks for `MaxBytesPerSecond` in `src/Parser.luau`), every
+  schema gets `option MaxBytesPerSecond = 0` and
+  `option MaxEventsPerSecond = 0`, which turn off the per-player per-second
+  buckets. They refill from `os.clock`, and the harness runs frames much faster
+  than 30 Hz of wall-clock time, so honest traffic would trip them; this is the
+  same reason the BlinkBlox schemas raise BlinkBlox's limits. As a fairness
+  note, everything else in Current's server hardening stays **on** and is
+  timed: the per-packet argument, size and event-count limits, the value
+  checks (finite floats, UTF-8 strings, which Zap and stock Blink do not do)
+  and the `xpcall` around each received packet. Stock Blink has none of these
+  options, so its schemas compile unchanged. With the `reuse` flag the schemas
+  also get `option ReuseReceiveTables = true`.
 * **zap**: no `f16`, so `match_state` `PlayerState.Vel` is
   `vector(f32, f32, f32)` (12 bytes per player instead of 6: +132 bytes per
   snapshot). No bitfield `set` of named flags (Zap's `set` is a dynamic
@@ -314,8 +333,12 @@ fields within 1e-3 (the driver only sends f16-representable values).
 
 ## Adapter interface
 
-A variant is `label = adapter : source`. An adapter is a directory
-`adapters/<name>/` with two files.
+A variant is `label = adapter[+flag...] : source`. An adapter is a directory
+`adapters/<name>/` with two files. Flags are optional build switches for
+variants of one library from the same source: `run.py` passes them to
+`build.sh` as `BENCH_FLAGS` (comma-separated) and records them in the result
+JSON (`flags`); an adapter whose `build.sh` does not mention `BENCH_FLAGS`
+refuses flags. The `blink` adapter knows `reuse` and fails on anything else.
 
 ### `build.sh <sourceDir> <outDir>`
 

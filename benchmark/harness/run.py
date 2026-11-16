@@ -9,6 +9,11 @@ them equally (recommended for comparisons):
     python3 run.py --variant stock=blink:/path/to/blink-stock \\
                    --variant current=blink:/path/to/current [options]
 
+A variant is LABEL=ADAPTER[+FLAG...]:SOURCE. Flags are passed to the adapter's
+build.sh as BENCH_FLAGS (comma-separated); what they mean is up to the adapter
+(blink: `reuse` turns ReuseReceiveTables on), e.g.
+    --variant current-reuse=blink+reuse:/path/to/current
+
 Options: --runs N (default 7)  --frames F (default 600, scaled per scenario by
 frames_scale in scenarios/manifest.json)  --warmup W (default 120)
 --scenarios a,b  --modes interp,native  --cpu N (taskset pin, -1 = off)
@@ -70,8 +75,9 @@ def ensure_host():
 
 
 class Variant:
-    def __init__(self, label, adapter, source):
+    def __init__(self, label, adapter, source, flags=()):
         self.label, self.adapter, self.source = label, adapter, os.path.abspath(source)
+        self.flags = list(flags)
         self.out_dir = os.path.join(HERE, "gen", label)
         self.static = {}
         self.results = {}
@@ -80,8 +86,14 @@ class Variant:
         script = os.path.join(HERE, "adapters", self.adapter, "build.sh")
         if not os.path.exists(script):
             raise SystemExit(f"unknown adapter {self.adapter!r}: {script} not found")
-        log(f"== building {self.label} ({self.adapter} from {self.source})")
-        subprocess.check_call([script, self.source, self.out_dir], stdout=sys.stderr)
+        if self.flags:
+            with open(script) as f:
+                if "BENCH_FLAGS" not in f.read():
+                    raise SystemExit(f"adapter {self.adapter!r} takes no flags (got {'+'.join(self.flags)})")
+        flags = f" +{'+'.join(self.flags)}" if self.flags else ""
+        log(f"== building {self.label} ({self.adapter}{flags} from {self.source})")
+        env = dict(os.environ, BENCH_FLAGS=",".join(self.flags))
+        subprocess.check_call([script, self.source, self.out_dir], stdout=sys.stderr, env=env)
 
     def schema_ok(self, schema):
         return os.path.exists(os.path.join(self.out_dir, schema, "ok"))
@@ -169,7 +181,7 @@ def main():
     ap.add_argument("source", nargs="?")
     ap.add_argument("label", nargs="?")
     ap.add_argument("--adapter", default="blink")
-    ap.add_argument("--variant", action="append", default=[], metavar="LABEL=ADAPTER:SOURCE")
+    ap.add_argument("--variant", action="append", default=[], metavar="LABEL=ADAPTER[+FLAG...]:SOURCE")
     ap.add_argument("--runs", type=int, default=7)
     ap.add_argument("--frames", type=int, default=600)
     ap.add_argument("--warmup", type=int, default=120)
@@ -181,11 +193,13 @@ def main():
 
     variants = []
     if args.source and args.label:
-        variants.append(Variant(args.label, args.adapter, args.source))
+        adapter, *flags = args.adapter.split("+")
+        variants.append(Variant(args.label, adapter, args.source, flags))
     for spec in args.variant:
         label, rest = spec.split("=", 1)
         adapter, source = rest.split(":", 1)
-        variants.append(Variant(label, adapter, source))
+        adapter, *flags = adapter.split("+")
+        variants.append(Variant(label, adapter, source, flags))
     if not variants:
         ap.error("give <sourceDir> <label> or at least one --variant")
 
@@ -258,6 +272,7 @@ def main():
         out = {
             "label": v.label,
             "adapter": v.adapter,
+            "flags": v.flags,
             "source": v.source,
             "date": datetime.datetime.now().isoformat(timespec="seconds"),
             "host": {"machine": platform.machine(), "cpus": os.cpu_count(), "luau": "0.700 (luau-bench)"},

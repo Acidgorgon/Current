@@ -30,7 +30,8 @@ type AssertGenerator = (Variable: string, ...any) -> AssertPrefab
 
 local SEND_BUFFER = "SendBuffer"
 local RECIEVE_BUFFER = "RecieveBuffer"
-local SEND_POSITION = "SendOffset"
+--> Where the last Allocate(Length) started (Allocate is inlined, so it returns no offset here)
+local SEND_POSITION = "SendCursor - Length"
 
 local BYTE = 1
 local SHORT = 2

@@ -2,14 +2,13 @@ return [[local Invocations = 0
 
 --> Send state. The Send* upvalues are the "loaded" writer that the generated
 --> serializers write into. A Writer record holds a writer's state while it is
---> not loaded. Load/Save copy fields in and out and never allocate.
+--> not loaded. Loading and saving a writer copy its fields in and out and never allocate.
 --> Home is the reliable outbox on the client and the broadcast log shared by
 --> every player on the server. Current is the writer whose state is in the
 --> Send* upvalues: always Home on the client; on the server the writer of the
 --> last player sent to stays loaded until a send needs another one, so a run
 --> of Fire calls to one player pays for one switch instead of one per call.
 local SendSize = 64
-local SendOffset = 0
 local SendCursor = 0
 local SendBuffer = buffer.create(64)
 local SendInstances = {}
@@ -37,8 +36,6 @@ type Writer = {
     Cursor: number,
     Buffer: buffer,
     Instances: {any},
-    --> Cached exact-size outgoing buffer (only reused when ReuseSendBuffers is on)
-    Out: buffer?,
     --> Server only: how many bytes/instances of the broadcast log this writer already holds
     Synced: number,
     SyncedInstances: number,
@@ -50,7 +47,6 @@ local function NewWriter(): Writer
         Cursor = 0,
         Buffer = buffer.create(64),
         Instances = {},
-        Out = nil,
         Synced = 0,
         SyncedInstances = 0,
     }
@@ -72,7 +68,6 @@ end
 local function Load(Writer: Writer)
     SendSize = Writer.Size
     SendCursor = Writer.Cursor
-    SendOffset = Writer.Cursor
     SendBuffer = Writer.Buffer
     SendInstances = Writer.Instances
 end
@@ -93,25 +88,54 @@ local function Invoke()
     return Invocation
 end
 
-local function Allocate(Bytes: number)
-    local InUse = (SendCursor + Bytes)
-    if InUse > SendSize then
-        --> Grow geometrically; writers keep their capacity between frames
-        local Size = SendSize
-        while InUse > Size do
-            Size *= 2
-        end
-
-        local Buffer = buffer.create(Size)
-        buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-        SendBuffer = Buffer
-        SendSize = Size
+--> Cold path of the allocator below: grows the loaded writer geometrically to hold InUse bytes.
+--> Writers keep their capacity between frames.
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Grow
+Grow = function(InUse: number)
+    local Size = SendSize
+    while InUse > Size do
+        Size *= 2
     end
 
-    SendOffset = SendCursor
+    local Buffer = buffer.create(Size)
+    buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+    SendBuffer = Buffer
+    SendSize = Size
+end
+
+local function Allocate(Bytes: number)
+    local Offset = SendCursor
+    local InUse = Offset + Bytes
+    if InUse > SendSize then
+        Grow(InUse)
+    end
+
     SendCursor = InUse
 
-    return SendOffset
+    return Offset
+end
+
+--> ReuseSendBuffers: one outgoing buffer per size, shared by every send of that size
+--> (remotes copy their arguments when fired), up to OUT_POOL_LIMIT bytes in total.
+local OUT_POOL_LIMIT = 65536
+local OutPool: {[number]: buffer} = {}
+local OutPoolBytes = 0
+
+--> New exact-size outgoing buffer
+local function NewOut(Size: number): buffer
+    if REUSE_SEND_BUFFERS then
+        local Out = OutPool[Size]
+        if Out == nil then
+            Out = buffer.create(Size)
+            if OutPoolBytes + Size <= OUT_POOL_LIMIT then
+                OutPool[Size] = Out
+                OutPoolBytes += Size
+            end
+        end
+        return Out
+    end
+    return buffer.create(Size)
 end
 
 --> Exact-size copy of a saved writer's contents, ready to hand to a remote.
@@ -119,19 +143,35 @@ end
 local Pack
 Pack = function(Writer: Writer): buffer
     local Cursor = Writer.Cursor
-    local Out = Writer.Out
-    if Out == nil or buffer.len(Out) ~= Cursor then
-        Out = buffer.create(Cursor)
-        if REUSE_SEND_BUFFERS then
-            Writer.Out = Out
-        end
-    end
-
-    buffer.copy(Out :: buffer, 0, Writer.Buffer, 0, Cursor)
-    return Out :: buffer
+    local Out = NewOut(Cursor)
+    buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
+    return Out
 end
 
---> Unreliable sends, FireList and exports serialize into the Scratch writer.
+--> Unreliable sends serialize past the end of the loaded writer (its unsent data before
+--> Start is left as it was), then Cut takes the event back out as a packet of its own:
+--> no writer switch. Returns the packet and its instances (nil when there are none).
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Cut
+Cut = function(Start: number, InstanceStart: number): (buffer, {any}?)
+    local Size = SendCursor - Start
+    local Out = NewOut(Size)
+    buffer.copy(Out, 0, SendBuffer, Start, Size)
+    SendCursor = Start
+
+    local Count = #SendInstances
+    if Count == InstanceStart then
+        return Out, nil
+    end
+
+    local Instances = table.move(SendInstances, InstanceStart + 1, Count, 1, {})
+    for Index = Count, InstanceStart + 1, -1 do
+        SendInstances[Index] = nil
+    end
+    return Out, Instances
+end
+
+--> Reliable FireList and exports serialize into the Scratch writer.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local BeginScratch
 BeginScratch = function()

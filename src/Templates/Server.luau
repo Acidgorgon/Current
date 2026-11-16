@@ -23,45 +23,57 @@ if not Unreliable then
     Unreliable = UnreliableRemoteEvent
 end
 
---> Unreliable sends: the event was serialized into Scratch
+--> Unreliable sends: the event was serialized past the end of the loaded writer, from Start.
+--> Every send leaves out the instance array when it is empty: an empty table would still
+--> be serialized by the remote and rebuilt by the receiver on every packet.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliable
-SendUnreliable = function(Player: Player)
-    Save(Scratch)
-    Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
-    EndScratch()
+SendUnreliable = function(Player: Player, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
+    if Instances then
+        Unreliable:FireClient(Player, Packet, Instances)
+    else
+        Unreliable:FireClient(Player, Packet)
+    end
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableAll
-SendUnreliableAll = function()
-    Save(Scratch)
-    Unreliable:FireAllClients(Pack(Scratch), SendInstances)
-    EndScratch()
+SendUnreliableAll = function(Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
+    if Instances then
+        Unreliable:FireAllClients(Packet, Instances)
+    else
+        Unreliable:FireAllClients(Packet)
+    end
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableList
-SendUnreliableList = function(List: {Player})
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
+SendUnreliableList = function(List: {Player}, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
     for _, Player in List do
-        Unreliable:FireClient(Player, Buffer, SendInstances)
+        if Instances then
+            Unreliable:FireClient(Player, Packet, Instances)
+        else
+            Unreliable:FireClient(Player, Packet)
+        end
     end
-    EndScratch()
 end
 
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliableExcept
-SendUnreliableExcept = function(Except: Player)
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
+SendUnreliableExcept = function(Except: Player, Start: number, InstanceStart: number)
+    local Packet, Instances = Cut(Start, InstanceStart)
     for _, Player in Players:GetPlayers() do
         if Player ~= Except then
-            Unreliable:FireClient(Player, Buffer, SendInstances)
+            if Instances then
+                Unreliable:FireClient(Player, Packet, Instances)
+            else
+                Unreliable:FireClient(Player, Packet)
+            end
         end
     end
-    EndScratch()
 end
 
 -- RELIABLE --
@@ -112,6 +124,10 @@ CatchUp = function(Writer: Writer)
     end
 end
 
+--> The player whose writer is loaded (Current), or nil. Sends to that player only
+--> compare it, without looking up their writer.
+local CurrentPlayer: Player? = nil
+
 --> Makes Writer the loaded writer. A player's writer is caught up with the
 --> broadcast log first, so events stay in the order they were sent.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
@@ -120,9 +136,12 @@ Switch = function(Writer: Writer)
     Save(Current)
     Load(Writer)
     Current = Writer
+    CurrentPlayer = nil
     if Writer ~= Home then
         Private = true
-        CatchUp(Writer)
+        if Writer.Synced ~= Home.Cursor or Writer.SyncedInstances ~= #Home.Instances then
+            CatchUp(Writer)
+        end
     end
 end
 
@@ -138,6 +157,7 @@ UsePlayer = function(Player: Player)
         end
     end
     Switch(Writer)
+    CurrentPlayer = Player
 end
 
 --> FireExcept: catch the excluded player up to the log, then mark them as past the new event
@@ -172,7 +192,7 @@ SendReliableList = function(List: {Player})
     local InstanceCount = #Instances
     Load(Current)
     for _, Player in List do
-        if PlayersMap[Player] ~= Current then
+        if Player ~= CurrentPlayer then
             UsePlayer(Player)
         end
         local Position = Allocate(Size)
@@ -200,6 +220,9 @@ Players.PlayerAdded:Connect(function(Player)
     if PlayersMap[Player] == nil then
         Save(Current)
         CreateWriter(Player, Home.Cursor, #Home.Instances)
+        if CurrentPlayer == Player then
+            CurrentPlayer = nil
+        end
         if Home.Cursor > 0 then
             Private = true
         end
@@ -208,12 +231,16 @@ end)
 
 Players.PlayerRemoving:Connect(function(Player)
     PlayersMap[Player] = nil
+    if CurrentPlayer == Player then
+        CurrentPlayer = nil
+    end
     Departed[Player] = true
 end)
 
 local function StepReplication()
     Save(Current)
     Current = Home
+    CurrentPlayer = nil
 
     local BroadcastSize = Home.Cursor
     local BroadcastInstances = Home.Instances
@@ -221,34 +248,60 @@ local function StepReplication()
     if not Private then
         --> Nobody has private data this frame: one FireAllClients covers everyone
         if BroadcastSize > 0 then
-            Reliable:FireAllClients(Pack(Home), BroadcastInstances)
+            if #BroadcastInstances > 0 then
+                Reliable:FireAllClients(Pack(Home), BroadcastInstances)
+            else
+                Reliable:FireAllClients(Pack(Home))
+            end
         end
     else
         Private = false
         local Broadcast: buffer? = nil
+        local BroadcastInstanceCount = #BroadcastInstances
         for Player, Writer in PlayersMap do
-            if Writer.Cursor == 0 and Writer.Synced == 0 then
+            local Cursor = Writer.Cursor
+            local Synced = Writer.Synced
+            if Cursor == 0 and Synced == 0 then
                 if BroadcastSize > 0 then
                     if Broadcast == nil then
                         Broadcast = Pack(Home)
                     end
-                    Reliable:FireClient(Player, Broadcast, BroadcastInstances)
+                    if BroadcastInstanceCount > 0 then
+                        Reliable:FireClient(Player, Broadcast, BroadcastInstances)
+                    else
+                        Reliable:FireClient(Player, Broadcast)
+                    end
                 end
                 continue
             end
 
-            Load(Writer)
-            CatchUp(Writer)
-            Save(Writer)
-
-            if Writer.Cursor > 0 then
-                Reliable:FireClient(Player, Pack(Writer), Writer.Instances)
+            --> Append the end of the broadcast log this writer has not seen yet
+            if Synced ~= BroadcastSize or Writer.SyncedInstances ~= BroadcastInstanceCount then
+                Load(Writer)
+                CatchUp(Writer)
+                Save(Writer)
+                Cursor = SendCursor
             end
-
-            Writer.Cursor = 0
             Writer.Synced = 0
             Writer.SyncedInstances = 0
-            table.clear(Writer.Instances)
+
+            if Cursor > 0 then
+                local Out: buffer
+                if REUSE_SEND_BUFFERS then
+                    Out = Pack(Writer)
+                else
+                    Out = buffer.create(Cursor)
+                    buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
+                end
+                Writer.Cursor = 0
+                local Instances = Writer.Instances
+                if #Instances > 0 then
+                    Reliable:FireClient(Player, Out, Instances)
+                    table.clear(Instances)
+                else
+                    Reliable:FireClient(Player, Out)
+                end
+            end
         end
     end
 

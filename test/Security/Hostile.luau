@@ -132,14 +132,14 @@ local PlayersService = {
 }
 
 local Remotes = {
-	BLINK_RELIABLE_REMOTE = ServerRemote("Reliable"),
-	BLINK_UNRELIABLE_REMOTE = ServerRemote("Unreliable"),
+	CURRENT_RELIABLE_REMOTE = ServerRemote("Reliable"),
+	CURRENT_UNRELIABLE_REMOTE = ServerRemote("Unreliable"),
 }
 
 --> Client side: what the honest client sends is captured, not delivered
 local Outbox: { { Remote: string, Buffer: buffer, Instances: { any } } } = {}
 local ClientRemotes = {}
-for Name, Channel in { BLINK_RELIABLE_REMOTE = "Reliable", BLINK_UNRELIABLE_REMOTE = "Unreliable" } do
+for Name, Channel in { CURRENT_RELIABLE_REMOTE = "Reliable", CURRENT_UNRELIABLE_REMOTE = "Unreliable" } do
 	ClientRemotes[Name] = {
 		OnClientEvent = Signal(),
 		FireServer = function(_, Buffer, Instances)
@@ -463,7 +463,7 @@ local MaxPacketTime = 0
 local TotalPacketTime = 0
 
 local function Deliver(Player: any, Remote: string, ...)
-	local Signal = Remotes[if Remote == "Reliable" then "BLINK_RELIABLE_REMOTE" else "BLINK_UNRELIABLE_REMOTE"].OnServerEvent
+	local Signal = Remotes[if Remote == "Reliable" then "CURRENT_RELIABLE_REMOTE" else "CURRENT_UNRELIABLE_REMOTE"].OnServerEvent
 	local Start = os.clock()
 	local Success, Error = pcall(Signal.Fire, Signal, Player, ...)
 	local Elapsed = os.clock() - Start
@@ -1092,8 +1092,8 @@ do
 
 	--> Reload both sides of the wide schema and round-trip through them
 	local SavedServer, SavedClient = Server, Client
-	Remotes.BLINK_RELIABLE_REMOTE = ServerRemote("Reliable")
-	Remotes.BLINK_UNRELIABLE_REMOTE = ServerRemote("Unreliable")
+	Remotes.CURRENT_RELIABLE_REMOTE = ServerRemote("Reliable")
+	Remotes.CURRENT_UNRELIABLE_REMOTE = ServerRemote("Unreliable")
 	for _, Remote in ClientRemotes do
 		Remote.OnClientEvent = Signal()
 	end
@@ -1145,7 +1145,7 @@ do
 	WideS.Inside.Both.Fire(Attacker, 55)
 	WideS.StepReplication()
 	for _, Packet in ToClient[Attacker] or {} do
-		ClientRemotes[if Packet.Remote == "Reliable" then "BLINK_RELIABLE_REMOTE" else "BLINK_UNRELIABLE_REMOTE"].OnClientEvent:Fire(Packet.Buffer, Packet.Instances)
+		ClientRemotes[if Packet.Remote == "Reliable" then "CURRENT_RELIABLE_REMOTE" else "CURRENT_UNRELIABLE_REMOTE"].OnClientEvent:Fire(Packet.Buffer, Packet.Instances)
 	end
 	Check(ClientSeen == 55, "wide schema server to client")
 	Check(Answer == 42, `wide schema function answer, got {Answer}`)

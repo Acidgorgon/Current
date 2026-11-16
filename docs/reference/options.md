@@ -160,13 +160,15 @@ This option is Current only; upstream Blink rejects it.
 
 ## `RemoteScope`
 
-Default `""`. A prefix for the remotes the generated modules create in `ReplicatedStorage`. Without it they are `BLINK_RELIABLE_REMOTE` and `BLINK_UNRELIABLE_REMOTE`; with `option RemoteScope = "PACKAGE"` they are `PACKAGE_BLINK_RELIABLE_REMOTE` and `PACKAGE_BLINK_UNRELIABLE_REMOTE`.
+Default `""`. A prefix for the remotes the generated modules create in `ReplicatedStorage`. Without it they are `CURRENT_RELIABLE_REMOTE` and `CURRENT_UNRELIABLE_REMOTE`; with `option RemoteScope = "PACKAGE"` they are `PACKAGE_CURRENT_RELIABLE_REMOTE` and `PACKAGE_CURRENT_UNRELIABLE_REMOTE`.
 
 ```blink
 option RemoteScope = "PACKAGE"
 ```
 
-Use it when Current runs inside a package (or a game has several schemas compiled separately), so the modules don't collide with the game's own. Two modules with the same scope running at once is an error.
+Use it when Current runs inside a package (or a game has several schemas compiled separately), so the modules don't collide with the game's own. Two Current modules with the same scope running at once is an error.
+
+Current's remotes and its `_G._CURRENT` registry have different names from Blink's (`BLINK_RELIABLE_REMOTE`, `_G._BLINK`), so a Current module and a Blink module can run in the same game without setting a scope.
 
 ## `UseColon`
 

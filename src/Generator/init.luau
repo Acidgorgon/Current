@@ -20,7 +20,7 @@ local Sources = {
 	Server = string.split(require("./Templates/Server"), "-- SPLIT --"),
 }
 
-local EVENTS_TYPE = "BLINK_EVENTS_SYMBOL"
+local EVENTS_TYPE = "CURRENT_EVENTS_SYMBOL"
 local DIRECTIVES = {
 	"--!strict\n",
 	"--!native\n",
@@ -54,7 +54,7 @@ local SYNC_VALIDATION_BODY = {
 local EVENT_SYNC_VALIDATION = {
 	"if SerdesThread ~= nil then\n",
 	'\tif coroutine.status(SerdesThread) == "suspended" then\n',
-	'\t\twarn(`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)\n',
+	'\t\twarn(`[Current]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)\n',
 	"\t\tcoroutine.close(SerdesThread)\n",
 	"\tend\n",
 	"\tSerdesThread = nil\n",
@@ -1163,7 +1163,7 @@ function Declarations.Function(Declaration: Parser.Function)
 			:Line(`Spawn({Connection}, Player, {DataArguments}, InvocationIdentifier)`)
 			:Branch("Default")
 			:Compare(`#{Queue}`, "256", "Greater")
-			:Line(`warn("[Blink]: Event queue of \\"{Name}\\" exceeded 256, did you forget to implement a listener?")`)
+			:Line(`warn("[Current]: Event queue of \\"{Name}\\" exceeded 256, did you forget to implement a listener?")`)
 			:End()
 			:Compare(`#{Queue}`, "QUEUE_LIMIT", "GreaterOrEquals")
 			:Line(`FailInvocation(Player, {Index}, InvocationIdentifier)`)
@@ -2197,13 +2197,13 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 
 	local ScopeValidationBody = {}
 	if Context ~= "Shared" then
-		local RemoteScope = Options.RemoteScope or "BLINK"
+		local RemoteScope = Options.RemoteScope or "CURRENT"
 		ScopeValidationBody = {
-			"_G._BLINK = _G._BLINK or {}\n",
-			`if _G._BLINK["{RemoteScope}"] then\n`,
-			`\terror("[Blink]: An instance of blink is already running with the remote scope \\"{RemoteScope}\\". Change the remote scope of either instance to avoid conflicts.")\n`,
+			"_G._CURRENT = _G._CURRENT or {}\n",
+			`if _G._CURRENT["{RemoteScope}"] then\n`,
+			`\terror("[Current]: An instance of Current is already running with the remote scope \\"{RemoteScope}\\". Change the remote scope of either instance to avoid conflicts.")\n`,
 			"end\n",
-			`_G._BLINK["{RemoteScope}"] = true\n`,
+			`_G._CURRENT["{RemoteScope}"] = true\n`,
 		}
 	end
 
@@ -2214,7 +2214,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		string.split(Source[1], "\r"),
 		Imports.DumpLines(),
 		{ "local SerdesFunctions = {}\n" },
-		{ `local BASE_EVENT_NAME = "{Options.RemoteScope and Options.RemoteScope .. "_" or ""}BLINK"\n` },
+		{ `local BASE_EVENT_NAME = "{Options.RemoteScope and Options.RemoteScope .. "_" or ""}CURRENT"\n` },
 		{ `local REUSE_SEND_BUFFERS = {Options.ReuseSendBuffers == true}\n` },
 		--> Events queued before a listener connects: on the server clients fill them, so bounded
 		{ `local QUEUE_LIMIT = {if Context == "Server" then SERVER_QUEUE_LIMIT else "math.huge"}\n` },

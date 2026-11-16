@@ -18,17 +18,17 @@ local function Fire(Reliable: boolean, ...)
 	Buffer = Clone(Buffer)
 	Instances = table.clone(Instances)
 
-	Shared.Bridge:Fire("Client", Reliable and "BLINK_RELIABLE_REMOTE" or "BLINK_UNRELIABLE_REMOTE", Buffer, Instances)
+	Shared.Bridge:Fire("Client", Reliable and "CURRENT_RELIABLE_REMOTE" or "CURRENT_UNRELIABLE_REMOTE", Buffer, Instances)
 end
 
-ClientEnviornment.Instances.BLINK_RELIABLE_REMOTE = {
+ClientEnviornment.Instances.CURRENT_RELIABLE_REMOTE = {
 	FireServer = function(self, ...)
 		Fire(true, ...)
 	end,
 	OnClientEvent = Signal.new(),
 }
 
-ClientEnviornment.Instances.BLINK_UNRELIABLE_REMOTE = {
+ClientEnviornment.Instances.CURRENT_UNRELIABLE_REMOTE = {
 	FireServer = function(self, ...)
 		Fire(false, ...)
 	end,

@@ -1,6 +1,6 @@
 # Migrating from Blink
 
-Current is a drop-in replacement for [Blink](https://github.com/1Axen/blink) 0.18. It reads the same schema language and the same `.blink` files, generates modules with the same API, and uses the same remotes. Your game code does not change.
+Current is a drop-in replacement for [Blink](https://github.com/1Axen/blink) 0.18. It reads the same schema language and the same `.blink` files, and generates modules with the same API. Your game code does not change.
 
 ## Steps
 
@@ -22,7 +22,6 @@ That's it. If you used the Studio plugin, install `current-plugin.rbxm` instead 
 
 - **Schema language.** Every type, option, event and function field that Blink accepts, Current accepts with the same meaning. `.blink` files compile unchanged; `.current` is accepted as an extra extension.
 - **Generated API.** `Fire`, `FireAll`, `FireList`, `FireExcept`, `On`, `Iter`, `Invoke`, `StepReplication`, exports' `Read`/`Write`, and the `Casing` option all work as before. TypeScript output has the same shape.
-- **Remotes and runtime names.** The generated modules still create `BLINK_RELIABLE_REMOTE` and `BLINK_UNRELIABLE_REMOTE` (prefixed by `RemoteScope`), register in `_G._BLINK`, and tag their warnings `[Blink]`. This keeps old and new modules compatible and means a Current module and a Blink module in the same game need different `RemoteScope`s, just as two Blink modules did.
 - **CLI flags.** `--watch`, `--yes`, `--quiet`, `--compact`, `--help`, `--version` (see [CLI](/reference/cli)).
 
 ## What is new or different
@@ -38,6 +37,7 @@ That's it. If you used the Studio plugin, install `current-plugin.rbxm` instead 
 | Reliable broadcasts (`FireAll`) | copied into every player's buffer | written once into a shared log, whatever the player count |
 | Reliable sends to a player who left | re-add them to the send map (kept for good) | dropped |
 | Studio plugin | toolbar "Blink", output folder `Blink` | toolbar "Current", output folder `Current` |
+| Remotes and runtime names | `BLINK_RELIABLE_REMOTE`, `BLINK_UNRELIABLE_REMOTE`, `_G._BLINK`, warnings tagged `[Blink]` | `CURRENT_RELIABLE_REMOTE`, `CURRENT_UNRELIABLE_REMOTE`, `_G._CURRENT`, warnings tagged `[Current]` |
 
 Behaviour your code relies on is unchanged:
 
@@ -46,6 +46,8 @@ Behaviour your code relies on is unchanged:
 - Client data is validated on the server exactly as before.
 
 The generated code inside the modules is different (and faster): see [Performance](./performance). Don't depend on its internals, only on the returned table.
+
+Because the remotes have new names, a Current module and a Blink module can run side by side in the same game (for example while you move schemas over one at a time) without a [`RemoteScope`](/reference/options#remotescope). If any of your own code finds the remotes by name, update it to the new names.
 
 ## Going back
 

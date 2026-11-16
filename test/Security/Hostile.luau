@@ -646,7 +646,113 @@ do
 	print(`honest: {Delivered} packets, Everything x{Received.Everything or 0}, no reports`)
 end
 
----- 2. Random and mutated packets ----
+---- Event indexes, read off what the honest client sends ----
+
+local Attacker, Bystander = Players[1], Players[2]
+--> Players the fuzz never used, so no earlier state skews the counts
+local function FreshPlayer(Name: string)
+	return { Name = Name, UserId = #Name }
+end
+
+local function Expect(Name: string, ExpectedReason: string?, DetailPattern: string?)
+	local Reason, Detail = LastReason()
+	if ExpectedReason == nil then
+		Check(Reason == nil, `{Name}: expected no report, got {Reason} ({Detail})`)
+	else
+		Check(Reason == ExpectedReason, `{Name}: expected {ExpectedReason}, got {Reason} ({Detail})`)
+		if DetailPattern and Detail then
+			Check(string.find(Detail, DetailPattern, 1, true), `{Name}: detail "{Detail}" lacks "{DetailPattern}"`)
+		end
+	end
+	Reset()
+end
+
+local INPUT = IndexOf(function()
+	Client.Input.Fire(1, roblox.Vector3.new(1, 2, 3), 1)
+end)
+local CHAT = IndexOf(function()
+	Client.Chat.Fire("hi")
+end)
+local ARR = IndexOf(function()
+	Client.Arr.Fire({})
+end)
+local BLOB = IndexOf(function()
+	Client.Blob.Fire(buffer.create(0))
+end)
+local TOUCH = IndexOf(function()
+	Client.Touch.Fire(Part)
+end)
+local BOOM = IndexOf(function()
+	Client.Boom.Fire(1)
+end)
+local LIMITED = IndexOf(function()
+	Client.Limited.Fire(1)
+end)
+local UNHEARD = IndexOf(function()
+	Client.Unheard.Fire(1)
+end)
+local function InvokeIndex(Function): number
+	local Packets = Capture(function()
+		Task.spawn(function()
+			Function.Invoke(1)
+		end)
+	end)
+	return buffer.readu8(Packets[1].Buffer, 0)
+end
+local ASK = InvokeIndex(Client.Ask)
+local SLOW = InvokeIndex(Client.Slow)
+local UNANSWERED = InvokeIndex(Client.Unanswered)
+
+table.clear(ToClient)
+Server.ServerOnly.FireAll(7)
+Server.StepReplication()
+local SERVER_ONLY = buffer.readu8(ToClient[Players[1]][1].Buffer, 0)
+table.clear(ToClient)
+
+
+---- 2. Queues of events and calls nobody listens to (before the fuzz adds to them) ----
+
+do
+	--> A function nobody listens to: queued calls are bounded, overflow is answered with an error
+	table.clear(ToClient)
+	local Callers = {}
+	for Index = 1, 6 do
+		Callers[Index] = FreshPlayer(`Queued{Index}`)
+	end
+	for _, Caller in Callers do
+		for Id = 1, 200 do
+			Now += 1
+			Deliver(Caller, "Reliable", Bytes({ UNANSWERED, Id, 0 }), {})
+		end
+	end
+	Server.StepReplication()
+	local Failed = 0
+	for _, Packets in ToClient do
+		for _, Packet in Packets do
+			for Offset = 0, buffer.len(Packet.Buffer) - 3, 3 do
+				if buffer.readu8(Packet.Buffer, Offset) == UNANSWERED and buffer.readu8(Packet.Buffer, Offset + 2) == 0 then
+					Failed += 1
+				end
+			end
+		end
+	end
+	Check(Failed == 6 * 200 - 1024, `calls beyond the queue limit are answered with an error, got {Failed}`)
+	Reset()
+
+	--> An event nobody listens to: its queue is bounded too
+	for _ = 1, 1500 do
+		Now += 1
+		Deliver(Bystander, "Reliable", Bytes({ UNHEARD, 9 }), {})
+	end
+	local Flushed = 0
+	Server.Unheard.On(function()
+		Flushed += 1
+	end)
+	Check(Flushed == 1024, `queued events are capped at 1024, got {Flushed}`)
+	Reset()
+end
+
+---- 3. Random and mutated packets ----
 
 do
 	Reset()
@@ -766,68 +872,7 @@ do
 	end
 end
 
----- 3. Crafted attacks ----
-
-local Attacker, Bystander = Players[1], Players[2]
---> Players the fuzz never used, so no earlier state skews the counts
-local function FreshPlayer(Name: string)
-	return { Name = Name, UserId = #Name }
-end
-
-local function Expect(Name: string, ExpectedReason: string?, DetailPattern: string?)
-	local Reason, Detail = LastReason()
-	if ExpectedReason == nil then
-		Check(Reason == nil, `{Name}: expected no report, got {Reason} ({Detail})`)
-	else
-		Check(Reason == ExpectedReason, `{Name}: expected {ExpectedReason}, got {Reason} ({Detail})`)
-		if DetailPattern and Detail then
-			Check(string.find(Detail, DetailPattern, 1, true), `{Name}: detail "{Detail}" lacks "{DetailPattern}"`)
-		end
-	end
-	Reset()
-end
-
-local INPUT = IndexOf(function()
-	Client.Input.Fire(1, roblox.Vector3.new(1, 2, 3), 1)
-end)
-local CHAT = IndexOf(function()
-	Client.Chat.Fire("hi")
-end)
-local ARR = IndexOf(function()
-	Client.Arr.Fire({})
-end)
-local BLOB = IndexOf(function()
-	Client.Blob.Fire(buffer.create(0))
-end)
-local TOUCH = IndexOf(function()
-	Client.Touch.Fire(Part)
-end)
-local BOOM = IndexOf(function()
-	Client.Boom.Fire(1)
-end)
-local LIMITED = IndexOf(function()
-	Client.Limited.Fire(1)
-end)
-local UNHEARD = IndexOf(function()
-	Client.Unheard.Fire(1)
-end)
-local function InvokeIndex(Function): number
-	local Packets = Capture(function()
-		Task.spawn(function()
-			Function.Invoke(1)
-		end)
-	end)
-	return buffer.readu8(Packets[1].Buffer, 0)
-end
-local ASK = InvokeIndex(Client.Ask)
-local SLOW = InvokeIndex(Client.Slow)
-local UNANSWERED = InvokeIndex(Client.Unanswered)
-
-table.clear(ToClient)
-Server.ServerOnly.FireAll(7)
-Server.StepReplication()
-local SERVER_ONLY = buffer.readu8(ToClient[Players[1]][1].Buffer, 0)
-table.clear(ToClient)
+---- 4. Crafted attacks ----
 
 do
 	Reset()
@@ -1003,44 +1048,6 @@ do
 	Check(ReasonCounts.TooManyInvocations == 300 - 256, `calls in flight capped at 256, {ReasonCounts.TooManyInvocations} refused`)
 	Reset()
 
-	--> A function nobody listens to: queued calls are bounded, overflow is answered with an error
-	table.clear(ToClient)
-	local Callers = {}
-	for Index = 1, 6 do
-		Callers[Index] = FreshPlayer(`Queued{Index}`)
-	end
-	for _, Caller in Callers do
-		for Id = 1, 200 do
-			Now += 1
-			Deliver(Caller, "Reliable", Bytes({ UNANSWERED, Id, 0 }), {})
-		end
-	end
-	Server.StepReplication()
-	local Failed = 0
-	for _, Packets in ToClient do
-		for _, Packet in Packets do
-			for Offset = 0, buffer.len(Packet.Buffer) - 3, 3 do
-				if buffer.readu8(Packet.Buffer, Offset) == UNANSWERED and buffer.readu8(Packet.Buffer, Offset + 2) == 0 then
-					Failed += 1
-				end
-			end
-		end
-	end
-	--> The fuzz may have queued a few calls of its own, which only adds failures
-	Check(Failed >= 6 * 200 - 1024 and Failed < 6 * 200 - 1024 + 50, `calls beyond the queue limit are answered with an error, got {Failed}`)
-	Reset()
-
-	--> An event nobody listens to: its queue is bounded too
-	for _ = 1, 1500 do
-		Now += 1
-		Deliver(Bystander, "Reliable", Bytes({ UNHEARD, 9 }), {})
-	end
-	local Flushed = 0
-	Server.Unheard.On(function()
-		Flushed += 1
-	end)
-	Check(Flushed == 1024, `queued events are capped at 1024, got {Flushed}`)
-	Reset()
 end
 
 do
@@ -1058,7 +1065,7 @@ do
 	Server.SetInvalidPacketHandler(OnInvalid)
 end
 
----- 4. Wide schemas (u16 indexes), scopes, two-way events and functions, determinism ----
+---- 5. Wide schemas (u16 indexes), scopes, two-way events and functions, determinism ----
 
 do
 	local Lines = { "option ManualReplication = true", "option ServerOutput = \"a\"", "option ClientOutput = \"b\"" }

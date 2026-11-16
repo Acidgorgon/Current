@@ -1,5 +1,5 @@
 {
-  "_comment": "Scenario registry: driver file scenarios/<name>.luau, the schema (per-library definitions live in adapters/<adapter>/), whether it only exists in blink-plus, and frames_scale, a multiplier on --frames so cheap scenarios run long enough for stable timings.",
+  "_comment": "Scenario registry: driver file scenarios/<name>.luau, the schema (per-library definitions live in adapters/<adapter>/), whether it only exists in Current, and frames_scale, a multiplier on --frames so cheap scenarios run long enough for stable timings.",
   "scenarios": [
     {"name": "match_state_reliable", "schema": "match_state", "fork_only": false, "desc": "server FireAll 22-player match snapshot to 44 clients, Reliable, ManyAsync", "frames_scale": 1},
     {"name": "match_state_unreliable", "schema": "match_state", "fork_only": false, "desc": "server FireAll 22-player match snapshot to 44 clients, Unreliable, SingleSync", "frames_scale": 1},

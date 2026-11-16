@@ -1,7 +1,7 @@
 --!optimize 2
 -- Blink adapter: maps the scenario API contracts (see README.md, "Adapter
 -- interface") onto Blink-generated modules. Works for stock Blink and for
--- blink-plus, since it only uses Blink's public API
+-- Current, since it only uses Blink's public API
 -- (Fire/FireAll/FireList/FireExcept/On; replication runs on Heartbeat).
 --
 -- Functions are handed out directly (e.g. `fireAllReliable =

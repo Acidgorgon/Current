@@ -4,7 +4,7 @@
   "frames": 600,
   "interleaved_with": [
    "stock",
-   "plus",
+   "current",
    "blinkblox",
    "bytenet",
    "quicknet",

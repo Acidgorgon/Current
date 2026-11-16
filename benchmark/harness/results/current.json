@@ -26,7 +26,7 @@
   "luau": "0.700 (luau-bench)",
   "machine": "x86_64"
  },
- "label": "plus",
+ "label": "current",
  "scenarios": {
   "burst_async": {
    "desc": "1 client receives 200 events in one frame, ManyAsync listener",

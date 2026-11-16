@@ -7,7 +7,7 @@ Single variant (default adapter: blink):
 Several variants, runs interleaved A,B,A,B,... so machine drift hits all of
 them equally (recommended for comparisons):
     python3 run.py --variant stock=blink:/path/to/blink-stock \\
-                   --variant plus=blink:/path/to/blink [options]
+                   --variant current=blink:/path/to/current [options]
 
 Options: --runs N (default 7)  --frames F (default 600, scaled per scenario by
 frames_scale in scenarios/manifest.json)  --warmup W (default 120)

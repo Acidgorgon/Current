@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Print markdown tables comparing result files.
 
-    python3 tables.py results/plus.json results/stock.json ...
+    python3 tables.py results/current.json results/stock.json ...
 
 Columns follow the order of the arguments; the column name is each file's label.
 The best value in each row is bold. The `remotes` baseline is never marked best:

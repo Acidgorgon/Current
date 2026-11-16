@@ -6,8 +6,8 @@ Measures the CPU time, exact Luau heap allocations, module memory footprint and
 wire size of Roblox networking libraries on football-game-shaped traffic
 (40-50 player servers), and checks that every value received equals the value
 sent. Libraries plug in through **adapters**; the first adapter is
-[Blink](https://github.com/1Axen/blink) (stock v0.18.9 and the blink-plus
-fork). Further adapters: Zap, BlinkBlox, ByteNet, Warp, QuickNet, Lync, Packet and a
+[Blink](https://github.com/1Axen/blink) (stock v0.18.9 and its fork
+Current, this repo). Further adapters: Zap, BlinkBlox, ByteNet, Warp, QuickNet, Lync, Packet and a
 plain-RemoteEvent baseline (`remotes`); see [Adapters](#adapters) for what each one does and how its
 schemas differ from Blink's, and [Adding a library](#adding-a-library).
 
@@ -23,10 +23,10 @@ with a Roblox mock, in both interpreter (`-O2`) and native codegen mode.
 # several variants, runs interleaved A,B,A,B... (use this for comparisons:
 # machine drift then affects every variant equally)
 ./run.sh --variant stock=blink:$HOME/src/blink-stock \
-         --variant plus=blink:../..
+         --variant current=blink:../..
 
 # markdown comparison (ratios baseline/candidate, > 1 = candidate better)
-python3 compare.py results/stock.json results/plus.json [--mode interp|native|both]
+python3 compare.py results/stock.json results/current.json [--mode interp|native|both]
 ```
 
 Options: `--runs 7` (median is reported), `--frames 600` (multiplied per
@@ -223,7 +223,7 @@ does not), `tick` and `time` are real globals.
 
 ```sh
 ./run.sh --variant stock=blink:$HOME/src/blink-stock \
-         --variant plus=blink:../.. \
+         --variant current=blink:../.. \
          --variant zap=zap:$HOME/src/zap \
          --variant blinkblox=blinkblox:$HOME/src/BlinkBlox \
          --variant bytenet=bytenet:$HOME/src/ByteNet \
@@ -305,7 +305,7 @@ Blink's types, ranges, enums, `Type` and `Call` exactly):
 | `client_input` | client_input | 44 clients fire Unreliable input + Reliable action every 4th frame |
 | `many_events` | many_events | 120 declared events, 24 fired (FireAll) across the index range, 44 clients |
 | `burst_async` / `burst_sync` | burst | 1 client receives 200 events in one frame (ManyAsync / SingleSync) |
-| `two_way` | two_way | `From: Both` event: server FireAll + every client fires back (Blink: blink-plus only; Zap/BlinkBlox: two events; remotes: one RemoteEvent) |
+| `two_way` | two_way | `From: Both` event: server FireAll + every client fires back (Blink: Current only; Zap/BlinkBlox: two events; remotes: one RemoteEvent) |
 
 Verification: every frame, counts of received events are checked for every
 client, plus a sample of fields; every 10th frame (and for one rotating client

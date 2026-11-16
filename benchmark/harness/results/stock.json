@@ -3,7 +3,7 @@
  "config": {
   "frames": 600,
   "interleaved_with": [
-   "plus",
+   "current",
    "blinkblox",
    "zap",
    "bytenet",

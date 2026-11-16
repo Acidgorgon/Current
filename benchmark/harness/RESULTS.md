@@ -9,7 +9,7 @@ difference between libraries are in [README.md](README.md).
 
 | label | library |
 |---|---|
-| plus | blink-plus (this repo, commit 0975aa2) |
+| current | Current (this repo, commit 0975aa2) |
 | blinkblox | BlinkBlox 1.4.0, another Blink fork |
 | bytenet | ByteNet 0.4.3 |
 | zap | Zap 0.6.29 |
@@ -27,9 +27,9 @@ the scenario (stock Blink has no two-way events).
 
 ## Summary
 
-- **CPU:** blink-plus is the fastest library in every scenario, in native and
+- **CPU:** Current is the fastest library in every scenario, in native and
   interpreted mode. BlinkBlox is closest: 3–5% behind on the match snapshots and
-  17–67% behind elsewhere. Against stock Blink, blink-plus is 2.5x faster on the
+  17–67% behind elsewhere. Against stock Blink, Current is 2.5x faster on the
   match snapshot, 3.1x on 120 events and 2.3x on a 200-event burst.
 - **Server cost:** the server part of the frame drops furthest, because a
   broadcast is written once whatever the player count: 6.8x less than stock
@@ -39,7 +39,7 @@ the scenario (stock Blink has no two-way events).
   libraries; 2x less than stock on the snapshot, and almost none for many events.
 - **Bandwidth:** tied for the smallest snapshot with stock Blink and BlinkBlox
   (16-bit float velocities). Libraries without f16 send about 25% more.
-- **Memory:** blink-plus's modules are smaller than stock Blink's and far
+- **Memory:** Current's modules are smaller than stock Blink's and far
   smaller than BlinkBlox, Warp (~1.3 MB f16 table), QuickNet (~4 MB client
   queues) and Lync. Zap's client modules are a little smaller still.
 - **Plain RemoteEvents** send 3–4x more bytes, and the unreliable snapshot
@@ -52,7 +52,7 @@ comparable within this run.
 
 ### CPU per frame, native codegen (µs, server + all clients)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | **58.3** | 74.5 | 112.0 | 154.8 | 130.7 | 147.0 | 236.2 | 198.3 | 243.2 | 33.6 |
 | burst_sync | **37.4** | 62.5 | 111.6 | 114.2 | 87.2 | 123.7 | 242.3 | 196.4 | 231.8 | 34.3 |
@@ -65,7 +65,7 @@ comparable within this run.
 
 ### CPU per frame, interpreter (µs, server + all clients)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | **97.9** | 113.7 | 157.3 | 191.9 | 160.9 | 213.6 | 279.6 | 271.2 | 373.3 | 56.4 |
 | burst_sync | **65.0** | 83.1 | 157.6 | 135.9 | 114.1 | 185.9 | 266.3 | 268.8 | 358.3 | 55.2 |
@@ -78,7 +78,7 @@ comparable within this run.
 
 ### Receive cost per client, native (µs)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | **43.43** | 44.08 | 52.23 | 90.97 | 94.46 | 96.18 | 160.61 | 111.35 | 117.06 | 16.16 |
 | burst_sync | **21.72** | 27.10 | 52.22 | 46.52 | 49.55 | 78.69 | 164.10 | 110.51 | 108.59 | 16.89 |
@@ -91,7 +91,7 @@ comparable within this run.
 
 ### Library allocations per frame (bytes, interpreter)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | **38,408** | **38,408** | 38,472 | 360,192 | 337,438 | 60,800 | 117,816 | 128,090 | 46,034 | 0 |
 | burst_sync | **38,408** | **38,408** | 38,472 | 126,592 | 103,838 | 60,800 | 117,816 | 128,090 | 46,034 | 0 |
@@ -104,7 +104,7 @@ comparable within this run.
 
 ### Wire bytes per frame (all receivers, s2c + c2s)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | 3,205 | 3,205 | 3,204 | 3,205 | 3,205 | 3,205 | 3,203 | 3,207 | **3,007** | 10,000 |
 | burst_sync | 3,205 | 3,205 | 3,204 | 3,205 | 3,205 | 3,205 | 3,203 | 3,207 | **3,007** | 10,000 |
@@ -117,7 +117,7 @@ comparable within this run.
 
 ### Client module memory (KB, code + state)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | 20.7 | 59.7 | 128.9 | **16.1** | 34.4 | 4,178.1 | 196.0 | 1,278.7 | 827.0 | 7.0 |
 | burst_sync | 20.7 | 59.7 | 128.9 | **16.1** | 34.4 | 4,178.1 | 196.0 | 1,278.7 | 827.0 | 7.0 |
@@ -130,7 +130,7 @@ comparable within this run.
 
 ### Server module memory (KB, code + state)
 
-| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+| scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | burst_async | **30.3** | 67.6 | 135.9 | 34.4 | 31.1 | 307.3 | 205.4 | 1,291.7 | 889.7 | 5.8 |
 | burst_sync | **30.3** | 67.6 | 135.9 | 34.4 | 31.1 | 307.3 | 205.4 | 1,291.7 | 889.7 | 5.8 |

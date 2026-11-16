@@ -270,6 +270,8 @@ local function UpdateColors()
 			String = Color(Value, THEME.String)
 		elseif Type == "Boolean" then
 			String = Color(Value, THEME.Boolean)
+		elseif Type == "Number" then
+			String = Color(Value, THEME.Number)
 		elseif Type == "Comment" then
 			String = Color(Value, THEME.Comment)
 		elseif Type == "Unknown" then

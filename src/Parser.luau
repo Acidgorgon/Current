@@ -89,10 +89,21 @@ export type Options = {
 	RemoteScope: string?,
 	ReuseSendBuffers: boolean?,
 	ReuseReceiveTables: boolean?,
+	ShuffleEventIds: boolean?,
+	EventIdSeed: string?,
+	ValidateFloats: boolean?,
+	ValidateStrings: boolean?,
+	MaxPacketBytes: number?,
+	MaxPacketInstances: number?,
+	MaxEventsPerPacket: number?,
+	MaxBytesPerSecond: number?,
+	MaxEventsPerSecond: number?,
 }
 
 export type Body = Node<"Body", {
 	Options: Options,
+	--> Hash of the schema's tokens (and its imports'), seeds the event index shuffle
+	Hash: number,
 	Symbols: { [string]: true },
 	Declarations: { Declaration },
 }, {}>
@@ -169,12 +180,14 @@ export type Event = Node<"Event", {
 	Call: "SingleSync" | "SingleAsync" | "ManySync" | "ManyAsync" | "Polling",
 	ReuseTables: boolean?,
 	Data: (TypeNode | Tuple)?,
+	Rate: number?,
 }, {}>
 
 export type Function = Node<"Function", {
 	Yield: "Future" | "Promise" | "Coroutine",
 	Data: (TypeNode | Tuple)?,
 	Return: (TypeNode | Tuple)?,
+	Rate: number?,
 }, {}>
 
 export type ScopeNode = Node<"Scope", {
@@ -200,7 +213,19 @@ local OPTIONS: { [string]: Lexer.Types } = {
 	RemoteScope = "String",
 	ReuseSendBuffers = "Boolean",
 	ReuseReceiveTables = "Boolean",
+	ShuffleEventIds = "Boolean",
+	EventIdSeed = "String",
+	ValidateFloats = "Boolean",
+	ValidateStrings = "Boolean",
+	MaxPacketBytes = "Number",
+	MaxPacketInstances = "Number",
+	MaxEventsPerPacket = "Number",
+	MaxBytesPerSecond = "Number",
+	MaxEventsPerSecond = "Number",
 }
+
+--> Numeric options are limits: whole numbers, 0 turns the limit off
+local NUMERIC_OPTION_MAX = 2 ^ 31
 
 local EVENT: { EventOption } = {
 	{ Key = "From", Type = "Identifier", Values = { "Client", "Server", "Both" } },
@@ -209,12 +234,15 @@ local EVENT: { EventOption } = {
 	{ Key = "Poll", Type = "Boolean", Values = { true, false }, Optional = true },
 	{ Key = "ReuseTables", Type = "Boolean", Values = { true, false }, Optional = true },
 	{ Key = "Data", Type = "Identifier", Values = {}, Optional = true },
+	--> Server-enforced limit on how often each player may send this event, per second
+	{ Key = "Rate", Type = "Number", Values = {}, Optional = true },
 }
 
 local FUNCTION: { EventOption } = {
 	{ Key = "Yield", Type = "Identifier", Values = { "Future", "Promise", "Coroutine" } },
 	{ Key = "Data", Type = "Identifier", Values = {}, Optional = true },
 	{ Key = "Return", Type = "Identifier", Values = {}, Optional = true },
+	{ Key = "Rate", Type = "Number", Values = {}, Optional = true },
 }
 
 type Bucket = "Types" | "Scopes"
@@ -324,6 +352,7 @@ export type Parser = typeof(setmetatable(
 		Scope: Scope,
 		Symbols: { [string]: true },
 		Generics: Generics?,
+		ImportHashes: { number },
 	},
 	Parser
 ))
@@ -337,7 +366,40 @@ function Parser.new(Directory: string?, File: string?): Parser
 		Lexer = Lexer.new("Parsing"),
 		Symbols = {},
 		Scope = nil :: any,
+		ImportHashes = {},
 	}, Parser)
+end
+
+--> FNV-1a (32 bit) of the schema's token stream: whitespace, comments and line endings do not
+--> change it, so neither does reformatting a schema. Imported files are mixed in, in order.
+local function HashSource(Source: string, Imports: { number }): number
+	local Hash = 2166136261
+	local function Feed(Text: string)
+		for Index = 1, #Text do
+			Hash = bit32.bxor(Hash, string.byte(Text, Index))
+			--> Multiply by the FNV prime 16777619 = 2^24 + 403, keeping 32 bits exact
+			Hash = (bit32.lshift(Hash, 24) + Hash * 403) % 4294967296
+		end
+	end
+
+	local TokenLexer = Lexer.new("Parsing")
+	TokenLexer:Initialize(Source)
+	while true do
+		local Token = TokenLexer:GetNextToken()
+		if Token.Type == "EndOfFile" then
+			break
+		end
+		Feed(Token.Type)
+		Feed(tostring(Token.Value))
+		Feed("\0")
+	end
+
+	for _, Import in Imports do
+		Feed(tostring(Import))
+		Feed("\0")
+	end
+
+	return Hash
 end
 
 ---- Utility Functions ----
@@ -820,6 +882,7 @@ function Parser.Parse(self: Parser, Source: string, Scope: Scope?): Body
 	self.Scope = Scope or { Name = { Value = "", Start = 0, End = 0 } :: any, Symbols = { Types = {}, Scopes = {} } }
 	self.Source = Source
 	table.clear(self.Symbols)
+	table.clear(self.ImportHashes)
 
 	--> Start the lexer
 	self.Lexer:Initialize(Source)
@@ -837,6 +900,7 @@ function Parser.Parse(self: Parser, Source: string, Scope: Scope?): Body
 		Value = {
 			Symbols = table.clone(self.Symbols),
 			Options = Options,
+			Hash = HashSource(Source, self.ImportHashes),
 			Declarations = Declarations,
 		},
 		Tokens = {},
@@ -913,6 +977,7 @@ function Parser.Import(self: Parser): ScopeNode
 		error(ErrorText)
 	end
 
+	table.insert(self.ImportHashes, AST.Value.Hash)
 	Scope.Parent = Parent
 	self.Symbols[Name] = true
 	Parent.Symbols.Scopes[Name] = Scope
@@ -953,6 +1018,14 @@ function Parser.Options(self: Parser): Options
 		end
 
 		local Value = self:Consume(Type)
+		if Type == "Number" then
+			local Number = Value.Value :: any
+			if Number < 0 or Number % 1 ~= 0 or Number > NUMERIC_OPTION_MAX then
+				Error.new(Error.ParserUnknownOption, self.Source, `Invalid value for option "{Name}"`, self.File)
+					:Primary(Value, `Expected a whole number from 0 to {NUMERIC_OPTION_MAX} (0 turns the limit off)`)
+					:Emit()
+			end
+		end
 		Options[Name] = Value.Value
 	end
 
@@ -1120,7 +1193,13 @@ function Parser.Structure(self: Parser, Name: Token, Structure: { EventOption })
 			local Token = self:Consume(Option.Type)
 			Value = Token.Value
 
-			if not table.find(Option.Values, Value) then
+			if Option.Type == "Number" then
+				if Value <= 0 or Value > NUMERIC_OPTION_MAX then
+					Error.new(Error.ParserUnknownOption, self.Source, `Invalid value for "{Option.Key}"`, self.File)
+						:Primary(Token, `Expected a number above 0`)
+						:Emit()
+				end
+			elseif not table.find(Option.Values, Value) then
 				Error.new(Error.ParserUnknownOption, self.Source, `Unknown option "{Value}"`, self.File)
 					:Primary(Token, `Expected one of "{table.concat(Option.Values, `" or "`)}"`)
 					:Emit()
@@ -1178,6 +1257,7 @@ function Parser.Event(self: Parser, Name: Token): Event
 			Call = Call,
 			ReuseTables = Structure.ReuseTables,
 			Data = Structure.Data,
+			Rate = Structure.Rate,
 		},
 		Tokens = {},
 	}
@@ -1193,6 +1273,7 @@ function Parser.Function(self: Parser, Name: Token): Function
 			Yield = Structure.Yield,
 			Data = Structure.Data,
 			Return = Structure.Return,
+			Rate = Structure.Rate,
 		},
 		Tokens = {},
 	}

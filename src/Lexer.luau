@@ -116,6 +116,14 @@ local TOKENS = {
 		end,
 	},
 
+	--> Bare numbers (option values and event limits), before dotted identifiers so "0.5" stays a number
+	{
+		"^%-?%d+%.?%d*%f[^%w_%.]",
+		function(Token: string)
+			return "Number", tonumber(Token)
+		end,
+	},
+
 	--> Complex patterns
 	{ "^[%w_]+%.[%w_%.]+", "Identifier" },
 	{

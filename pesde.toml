@@ -1,18 +1,18 @@
 authors = ["1axen", "Acidgorgon"]
-description = "An IDL compiler written in Luau for ROBLOX buffer networking"
+description = "A faster Roblox networking IDL compiler with two-way events, forked from Blink"
 includes = [
     "README.md",
     "pesde.toml",
-    "release/blink_pesde.luau",
+    "release/current_pesde.luau",
 ]
 license = "MIT"
-name = "acidgorgon/blink_plus"
-repository = "https://github.com/Acidgorgon/blink-plus"
-version = "0.19.0"
+name = "acidgorgon/current"
+repository = "https://github.com/Acidgorgon/current"
+version = "0.1.0"
 
 [indices]
 default = "https://github.com/pesde-pkg/index"
 
 [target]
-bin = "release/blink_pesde.luau"
+bin = "release/current_pesde.luau"
 environment = "lune"

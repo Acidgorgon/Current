@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Tag for the new release, e.g. v0.19.0 (created from main)"
+        description: "Tag for the new release, e.g. v0.1.0 (created from main)"
         required: true
         type: string
 
@@ -39,8 +39,8 @@ jobs:
           else
             gh release create "$RELEASE_TAG" \
               --target main \
-              --title "blink-plus $RELEASE_TAG" \
-              --notes "blink-plus $RELEASE_TAG. Install with rokit: \`rokit add Acidgorgon/blink-plus blink\`, or download the archive for your platform below. The executable is named \`blink\`, a drop-in replacement for upstream Blink's CLI."
+              --title "Current $RELEASE_TAG" \
+              --notes "Current $RELEASE_TAG. Install with rokit: \`rokit add Acidgorgon/current\`, or download the archive for your platform below and put the \`current\` executable on your PATH. The Studio plugin is \`current-plugin.rbxm\`."
           fi
 
       # Check out the release tag itself so the build matches what was tagged.
@@ -64,19 +64,19 @@ jobs:
         run: lune run build
 
       - name: linux-aarch64
-        run: gh release upload "$RELEASE_TAG" release/blink-linux-aarch64.tar.xz --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-linux-aarch64.tar.xz --clobber
 
       - name: linux-x86_64
-        run: gh release upload "$RELEASE_TAG" release/blink-linux-x86_64.tar.xz --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-linux-x86_64.tar.xz --clobber
 
       - name: macos-aarch64
-        run: gh release upload "$RELEASE_TAG" release/blink-macos-aarch64.tar.xz --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-macos-aarch64.tar.xz --clobber
 
       - name: macos-x86_64
-        run: gh release upload "$RELEASE_TAG" release/blink-macos-x86_64.tar.xz --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-macos-x86_64.tar.xz --clobber
 
       - name: windows-x86_64
-        run: gh release upload "$RELEASE_TAG" release/blink-windows-x86_64.tar.gz --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-windows-x86_64.tar.gz --clobber
 
       - name: plugin
-        run: gh release upload "$RELEASE_TAG" release/blink-plugin.rbxm --clobber
+        run: gh release upload "$RELEASE_TAG" release/current-plugin.rbxm --clobber

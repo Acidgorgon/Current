@@ -102,9 +102,8 @@ local FIRE_FACTORIES = {
 	Server = {
 		ReliableFire1 = [[local function ReliableFire1(Write: (any) -> ()): any
     return function(Player: Player, Value: any)
-        local Writer = PlayersMap[Player]
-        if Writer ~= Current then
-            UsePlayer(Player, Writer)
+        if Player ~= CurrentPlayer then
+            UsePlayer(Player)
         end
         Write(Value)
     end
@@ -112,9 +111,8 @@ end
 ]],
 		ReliableFire = [[local function ReliableFire(Write: (...any) -> ()): any
     return function(Player: Player, ...)
-        local Writer = PlayersMap[Player]
-        if Writer ~= Current then
-            UsePlayer(Player, Writer)
+        if Player ~= CurrentPlayer then
+            UsePlayer(Player)
         end
         Write(...)
     end
@@ -802,8 +800,7 @@ function Declarations.Function(Declaration: Parser.Function)
 			Blocks.Function(Connection, `Player: Player, {DataValues}, InvocationIdentifier: number`, "()", true)
 				:Line(`local {ReturnValues};`)
 				:Lines(Serialize.Content, 1)
-				:Line("local Writer = PlayersMap[Player]")
-				:Line("if Writer ~= Current then UsePlayer(Player, Writer) end")
+				:Line("if Player ~= CurrentPlayer then UsePlayer(Player) end")
 				:Compare("Success", "true", "Not")
 				:Line(`local Position = Allocate({IndexBytes + 2})`)
 				:Line(`buffer.write{IndexType}(SendBuffer, Position, {Index})`)

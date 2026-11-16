@@ -112,6 +112,10 @@ CatchUp = function(Writer: Writer)
     end
 end
 
+--> The player whose writer is loaded (Current), or nil. Sends to that player only
+--> compare it, without looking up their writer.
+local CurrentPlayer: Player? = nil
+
 --> Makes Writer the loaded writer. A player's writer is caught up with the
 --> broadcast log first, so events stay in the order they were sent.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
@@ -120,17 +124,19 @@ Switch = function(Writer: Writer)
     Save(Current)
     Load(Writer)
     Current = Writer
+    CurrentPlayer = nil
     if Writer ~= Home then
         Private = true
         CatchUp(Writer)
     end
 end
 
---> Cold path of a send to one player: their writer (Writer, nil if they have none yet)
---> is not the loaded one. Same as Switch, with the catch-up skipped when there is nothing new.
+--> Cold path of a send to one player: their writer is not the loaded one.
+--> Same as Switch, with the catch-up skipped when there is nothing new.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local UsePlayer
-UsePlayer = function(Player: Player, Writer: Writer?)
+UsePlayer = function(Player: Player)
+    local Writer = PlayersMap[Player]
     if Writer == nil then
         Writer = CreateWriter(Player, 0, 0)
         if Departed[Player] then
@@ -140,6 +146,7 @@ UsePlayer = function(Player: Player, Writer: Writer?)
     Save(Current)
     Load(Writer :: Writer)
     Current = Writer :: Writer
+    CurrentPlayer = Player
     Private = true
     if (Writer :: Writer).Synced ~= Home.Cursor or (Writer :: Writer).SyncedInstances ~= #Home.Instances then
         CatchUp(Writer :: Writer)
@@ -178,9 +185,8 @@ SendReliableList = function(List: {Player})
     local InstanceCount = #Instances
     Load(Current)
     for _, Player in List do
-        local Writer = PlayersMap[Player]
-        if Writer ~= Current then
-            UsePlayer(Player, Writer)
+        if Player ~= CurrentPlayer then
+            UsePlayer(Player)
         end
         local Position = Allocate(Size)
         buffer.copy(SendBuffer, Position, Source, 0, Size)
@@ -207,6 +213,9 @@ Players.PlayerAdded:Connect(function(Player)
     if PlayersMap[Player] == nil then
         Save(Current)
         CreateWriter(Player, Home.Cursor, #Home.Instances)
+        if CurrentPlayer == Player then
+            CurrentPlayer = nil
+        end
         if Home.Cursor > 0 then
             Private = true
         end
@@ -215,12 +224,16 @@ end)
 
 Players.PlayerRemoving:Connect(function(Player)
     PlayersMap[Player] = nil
+    if CurrentPlayer == Player then
+        CurrentPlayer = nil
+    end
     Departed[Player] = true
 end)
 
 local function StepReplication()
     Save(Current)
     Current = Home
+    CurrentPlayer = nil
 
     local BroadcastSize = Home.Cursor
     local BroadcastInstances = Home.Instances

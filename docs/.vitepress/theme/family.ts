@@ -12,7 +12,7 @@ export interface Member {
 
 export const FAMILY: Record<Library, Member> = {
   current: { name: 'Current', role: 'Networking', site: 'https://acidgorgon.github.io/Current/' },
-  ripple: { name: 'Ripple', role: 'State sync', site: 'https://acidgorgon.github.io/ripple/' },
+  ripple: { name: 'Ripple', role: 'State sync', site: 'https://acidgorgon.github.io/Ripple/' },
   anchor: { name: 'Anchor', role: 'Data saving', site: 'https://acidgorgon.github.io/Anchor/' },
 }
 

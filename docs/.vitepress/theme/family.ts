@@ -39,12 +39,17 @@ export function familyNav(self: Library): DefaultTheme.NavItemWithChildren {
 }
 
 /** Footer shown on pages without a sidebar (the home page). */
-export function familyFooter(self: Library): DefaultTheme.Footer {
+export interface FamilyOptions {
+  /** License named in the footer, e.g. 'MIT' or 'Apache-2.0'. Defaults to 'MIT'. */
+  license?: string
+}
+
+export function familyFooter(self: Library, options: FamilyOptions = {}): DefaultTheme.Footer {
   const links = ORDER.map((id) =>
     id === self ? `<strong>${FAMILY[id].name}</strong>` : `<a href="${FAMILY[id].site}">${FAMILY[id].name}</a>`,
   ).join(' · ')
   return {
-    message: `Part of the ${links} family of Roblox libraries. Released under the MIT license.`,
+    message: `Part of the ${links} family of Roblox libraries. Released under the ${options.license ?? 'MIT'} license.`,
   }
 }
 
@@ -55,7 +60,7 @@ export function familyFooter(self: Library): DefaultTheme.Footer {
  *
  * `base` must equal the site's `base` (for example '/current/').
  */
-export function family(self: Library, base: string) {
+export function family(self: Library, base: string, options: FamilyOptions = {}) {
   const head: HeadConfig[] = [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}family/${self}.svg` }],
     ['meta', { name: 'theme-color', content: THEME_COLOR[self] }],
@@ -78,7 +83,7 @@ export function family(self: Library, base: string) {
     logo: { src: `/family/${self}.svg`, alt: FAMILY[self].name },
     search: { provider: 'local' },
     outline: { level: [2, 3], label: 'On this page' },
-    footer: familyFooter(self),
+    footer: familyFooter(self, options),
     docFooter: { prev: 'Previous', next: 'Next' },
     externalLinkIcon: true,
   }

@@ -38,6 +38,7 @@ Current is a fork of [Blink](https://github.com/1Axen/blink) by [1Axen](https://
 
 - **[Two-way events](./two-way-events).** `From: Both` declares one event that the server and clients can both fire and listen to.
 - **[Faster generated code](./performance).** A broadcast log on the server (a `FireAll` is written once whatever the player count), zero-garbage writers, table dispatch of received events, reused listener threads and shared fire functions. In the benchmark harness Current is the fastest of the nine serializing libraries tested, in every scenario.
+- **[A hardened server](./security).** The server treats every client packet as hostile: per-player limits on packet size, bytes and events per second (and an optional `Rate` per event or function), finite floats and valid UTF-8 on top of the schema's checks, and decoding under one protected call per packet, so a bad packet is dropped and reported to your [handler](/reference/generated-api#invalid-packets) instead of throwing. Event indexes are shuffled per schema. None of this costs the client anything.
 - **Garbage-free steady traffic.** [`ReuseSendBuffers`](/reference/options#reusesendbuffers) reuses outgoing buffers and [`ReuseReceiveTables`](/reference/options#reusereceivetables) decodes into the previous value's tables, so traffic that repeats every frame allocates almost nothing.
 
 See [Migrating from Blink](./migrating-from-blink) for the full list of differences.

@@ -37,13 +37,17 @@ That's it. If you used the Studio plugin, install `current-plugin.rbxm` instead 
 | Reliable broadcasts (`FireAll`) | copied into every player's buffer | written once into a shared log, whatever the player count |
 | Reliable sends to a player who left | re-add them to the send map (kept for good) | dropped |
 | Studio plugin | toolbar "Blink", output folder `Blink` | toolbar "Current", output folder `Current` |
+| Bad client packets | decoding errors are thrown from the remote handler | dropped and reported to [`SetInvalidPacketHandler`](/reference/generated-api#invalid-packets), never thrown |
+| Per-player limits | none | packet size, events per packet, bytes and events per second, on by default ([limits](/reference/options#limits)); optional per-event [`Rate`](/reference/events#rate) |
+| Value checks on client data | ranges, lengths, enums, instance classes | the same, plus finite floats ([`ValidateFloats`](/reference/options#validatefloats)) and valid UTF-8 ([`ValidateStrings`](/reference/options#validatestrings)) |
+| Event indexes on the wire | declaration order | shuffled per schema ([`ShuffleEventIds`](/reference/options#shuffleeventids)) |
 | Remotes and runtime names | `BLINK_RELIABLE_REMOTE`, `BLINK_UNRELIABLE_REMOTE`, `_G._BLINK`, warnings tagged `[Blink]` | `CURRENT_RELIABLE_REMOTE`, `CURRENT_UNRELIABLE_REMOTE`, `_G._CURRENT`, warnings tagged `[Current]` |
 
 Behaviour your code relies on is unchanged:
 
 - Reliable events reach each player in the order they were fired, whichever mix of `Fire`, `FireAll`, `FireList` and `FireExcept` sent them.
 - Reliable sends are batched and go out on `Heartbeat`, or when you call `StepReplication` with `ManualReplication` on. Unreliable events are sent immediately.
-- Client data is validated on the server exactly as before.
+- Client data that Blink accepted still reaches your listeners, with two exceptions on by default: NaN or infinite floats and strings that are not valid UTF-8 are now rejected (see [Security](./security)). If your clients legitimately send more than the default [limits](/reference/options#limits) allow, raise them.
 
 The generated code inside the modules is different (and faster): see [Performance](./performance). Don't depend on its internals, only on the returned table.
 
@@ -51,4 +55,4 @@ Because the remotes have new names, a Current module and a Blink module can run 
 
 ## Going back
 
-A schema that does not use `From: Both`, `ReuseSendBuffers`, `ReuseReceiveTables` or `ReuseTables` still compiles with upstream Blink. Put the `blink` line back in `rokit.toml` and recompile.
+A schema that does not use `From: Both`, `ReuseSendBuffers`, `ReuseReceiveTables`, `ReuseTables`, `Rate` or the security options (`ShuffleEventIds`, `EventIdSeed`, `ValidateFloats`, `ValidateStrings`, `Max…`) still compiles with upstream Blink. Put the `blink` line back in `rokit.toml` and recompile.

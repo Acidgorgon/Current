@@ -1,90 +1,142 @@
 # Results
 
-Run on 2026-11-16 with this harness: Luau 0.700 VM, mock Roblox with 44
-clients, 7 interleaved runs per variant (median shown), 600 frames after 120
-warmup frames. Every scenario passed the received-equals-sent check for every
-library. Raw numbers are in `results/<label>.json`; the method is in
-[README.md](README.md).
+One interleaved run of ten libraries on 2026-11-16: Luau 0.700 VM, mock
+Roblox with 44 clients, 7 runs per library (median shown), 600 frames after
+120 warmup frames, in native codegen and interpreter mode. Every library
+passed the received-equals-sent check in every scenario it can express.
+Raw numbers are in `results/<label>.json`; the method and every schema
+difference between libraries are in [README.md](README.md).
 
-Variants:
+| label | library |
+|---|---|
+| plus | blink-plus (this repo, commit 0975aa2) |
+| blinkblox | BlinkBlox 1.4.0, another Blink fork |
+| bytenet | ByteNet 0.4.3 |
+| zap | Zap 0.6.29 |
+| stock | upstream Blink 0.18.9 |
+| quicknet | QuickNet 0.4.0 |
+| packet | Packet 1.7 |
+| warp | Warp 1.1.0-pre8 |
+| lync | Lync 4.0 |
+| remotes | plain RemoteEvents, one per event, no serialization |
 
-- **stock**: upstream Blink v0.18.9
-- **plus**: blink-plus (this repo) at commit 9a04a93
-- **zap**: Zap 0.6.29, built from source
-- **blinkblox**: BlinkBlox 1.4.0 (HEAD 9894b33), another Blink fork
-- **remotes**: plain RemoteEvents, one per event, no serialization
+The best library value in each row is bold. `remotes` is never marked best:
+the mock cannot time Roblox's own C++ serialization of the tables it sends,
+so its CPU numbers are a lower bound. `n/a` means the library cannot express
+the scenario (stock Blink has no two-way events).
 
-ByteNet, Warp, QuickNet, Lync and Packet adapters are being added; this page
-will be updated with one combined run of every library.
+## Summary
 
-## Table
+- **CPU:** blink-plus is the fastest library in every scenario, in native and
+  interpreted mode. BlinkBlox is closest: 3–5% behind on the match snapshots and
+  17–67% behind elsewhere. Against stock Blink, blink-plus is 2.5x faster on the
+  match snapshot, 3.1x on 120 events and 2.3x on a 200-event burst.
+- **Server cost:** the server part of the frame drops furthest, because a
+  broadcast is written once whatever the player count: 6.8x less than stock
+  for the snapshot to 44 players, 20x for 120 events (1.5x for per-player
+  sends, the weakest case).
+- **Allocations:** tied with BlinkBlox for the least among the buffer
+  libraries; 2x less than stock on the snapshot, and almost none for many events.
+- **Bandwidth:** tied for the smallest snapshot with stock Blink and BlinkBlox
+  (16-bit float velocities). Libraries without f16 send about 25% more.
+- **Memory:** blink-plus's modules are smaller than stock Blink's and far
+  smaller than BlinkBlox, Warp (~1.3 MB f16 table), QuickNet (~4 MB client
+  queues) and Lync. Zap's client modules are a little smaller still.
+- **Plain RemoteEvents** send 3–4x more bytes, and the unreliable snapshot
+  (~2 KB per call) is over Roblox's unreliable size limit, so every one would be
+  dropped.
 
-"native" and "interp" are server + client CPU per frame in µs (all phases
-except the mock network copy). "recv" is the receive cost per client.
-"alloc" is bytes allocated per frame by the library; "net alloc" is the mock
-network's receive-side copy, kept apart because it is not library code.
-Heap is the module's memory after load (client / server).
+Other benchmark jobs were running on other cores during this run. Runs are
+interleaved library by library, so ratios are reliable; absolute µs are only
+comparable within this run.
 
-| scenario | variant | native µs | interp µs | recv/client nat / int µs | alloc B/f | net alloc B/f | wire B/f (s2c/c2s) | calls | heap client / server |
-|---|---|---|---|---|---|---|---|---|---|
-| match_state_reliable | stock | 538.7 | 729.0 | 10.57 / 14.60 | 674446 | 33971 | 22440 | 44 | 38.9K / 38.1K |
-| | **plus** | **213.1** | **477.4** | **4.22 / 9.89** | 327836 | 27833 | 22440 | 44 | 37.6K / 50.4K |
-| | zap | 520.1 | 680.7 | 9.93 / 12.98 | 700231 | 39888 | 28248 | 44 | 20.8K / 63.9K |
-| | blinkblox | 215.8 | 496.5 | 4.20 / 10.18 | 328273 | 28106 | 22440 | 44 | 67.6K / 83.2K |
-| | remotes | 36.9 | 40.0 | 0.33 / 0.40 | 0 | 586926 | 86981 | 44 | 5.2K / 5.8K |
-| match_state_unreliable | stock | 456.0 | 637.8 | 9.80 / 13.65 | 555327 | 27942 | 22440 | 44 | 38.9K / 38.1K |
-| | **plus** | **199.0** | **429.7** | **3.96 / 8.92** | 328164 | 28106 | 22440 | 44 | 37.6K / 50.4K |
-| | zap | 436.3 | 534.6 | 9.23 / 11.31 | 557260 | 33870 | 28204 | 44 | 20.8K / 63.9K |
-| | blinkblox | 195.8 | 451.0 | 3.83 / 9.29 | 328219 | 27997 | 22440 | 44 | 67.6K / 83.2K |
-| | remotes | 28.2 | 35.9 | 0.26 / 0.37 | 0 | 586871 | 86981 (all oversize) | 44 | 5.2K / 5.8K |
-| per_player | stock | 166.2 | 208.4 | 1.95 / 2.56 | 134260 | 14115 | 2595 | 44 | 60.2K / 54.7K |
-| | **plus** | **146.0** | **198.2** | **1.51 / 2.27** | 37267 | 14115 | 2595 | 44 | 34.1K / 48.2K |
-| | zap | 192.6 | 226.1 | 2.02 / 2.56 | 174724 | 14071 | 2551 | 44 | 20.0K / 68.8K |
-| | blinkblox | 149.2 | 197.2 | 1.69 / 2.49 | 36519 | 14071 | 2551 | 44 | 87.6K / 83.3K |
-| | remotes | 50.6 | 75.0 | 0.54 / 0.88 | 0 | 93430 | 8931 | 220 | 9.1K / 10.8K |
-| client_input | stock | 94.5 | 114.3 | – | 66044 | 3828 | 0 / 968 | 55 | 16.9K / 34.6K |
-| | **plus** | **85.2** | **117.4** | – | 34100 | 3828 | 0 / 968 | 55 | 24.9K / 41.4K |
-| | zap | 94.5 | 118.0 | – | 75856 | 3784 | 0 / 924 | 55 | 14.9K / 20.0K |
-| | blinkblox | 100.6 | 133.6 | – | 33924 | 3828 | 0 / 968 | 55 | 45.5K / 78.1K |
-| | remotes | 29.0 | 41.1 | – | 0 | 38192 | 0 / 4578 | 55 | 5.1K / 5.8K |
-| many_events | stock | 604.9 | 905.2 | 6.79 / 12.84 | 226080 | 15216 | 3696 | 44 | 824.6K / 926.4K |
-| | **plus** | **329.6** | **436.5** | **6.38 / 8.86** | 88 | 9024 | 3696 | 44 | 245.6K / 341.4K |
-| | zap | 540.7 | 779.0 | 4.13 / 9.45 | 365506 | 15243 | 3696 | 44 | 235.6K / 1261.4K |
-| | blinkblox | 296.8 | 390.1 | 5.46 / 7.73 | 88 | 9024 | 3696 | 44 | 934.2K / 612.4K |
-| | remotes | 230.0 | 302.7 | 4.61 / 6.03 | 0 | 71120 | 12672 | 1056 | 139.6K / 143.5K |
-| burst_async | stock | 133.8 | 158.9 | 97.89 / 112.45 | 337438 | 3544 | 3205 | 1 | 34.4K / 31.1K |
-| | **plus** | **85.0** | **121.0** | **48.80 / 72.21** | 38408 | 3544 | 3205 | 1 | 25.1K / 40.3K |
-| | zap | 163.5 | 192.4 | 93.16 / 114.34 | 360192 | 3544 | 3205 | 1 | 16.1K / 34.4K |
-| | blinkblox | 74.1 | 113.7 | 44.49 / 75.19 | 38408 | 3544 | 3205 | 1 | 59.7K / 67.6K |
-| | remotes | 29.2 | 47.1 | 16.50 / 27.33 | 0 | 96080 | 10000 | 200 | 7.0K / 5.8K |
-| burst_sync | stock | 81.5 | 114.7 | 47.35 / 66.84 | 103838 | 3544 | 3205 | 1 | 34.4K / 31.1K |
-| | **plus** | **60.4** | **96.5** | **24.86 / 46.35** | 38408 | 3544 | 3205 | 1 | 25.1K / 40.3K |
-| | zap | 111.0 | 149.6 | 46.46 / 66.72 | 126592 | 3544 | 3205 | 1 | 16.1K / 34.4K |
-| | blinkblox | 52.5 | 84.7 | 22.86 / 45.78 | 38408 | 3544 | 3205 | 1 | 59.7K / 67.6K |
-| | remotes | 28.9 | 48.8 | 16.11 / 28.21 | 0 | 96080 | 10000 | 200 | 7.0K / 5.8K |
-| two_way | stock | not supported | | | | | | | |
-| | **plus** | **59.5** | **78.1** | **0.35 / 0.53** | 720 | 8672 | 396 / 396 | 44/44 | 23.0K / 41.0K |
-| | zap | 66.9 | 99.0 | 0.29 / 0.45 | 22408 | 14864 | 396 / 396 | 44/44 | 12.9K / 24.1K |
-| | blinkblox | 81.3 | 99.2 | 0.44 / 0.63 | 16 | 8672 | 396 / 396 | 44/44 | 56.7K / 86.0K |
-| | remotes | 30.5 | 42.9 | 0.19 / 0.28 | 0 | 3040 | 396 / 396 | 44/44 | 3.9K / 4.2K |
+### CPU per frame, native codegen (µs, server + all clients)
 
-## Reading it
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | **58.3** | 74.5 | 112.0 | 154.8 | 130.7 | 147.0 | 236.2 | 198.3 | 243.2 | 33.6 |
+| burst_sync | **37.4** | 62.5 | 111.6 | 114.2 | 87.2 | 123.7 | 242.3 | 196.4 | 231.8 | 34.3 |
+| client_input | **91.6** | 107.4 | 116.7 | 99.3 | 99.2 | 137.0 | 184.5 | 197.0 | 622.4 | 31.5 |
+| many_events | **198.4** | 291.7 | 659.2 | 551.1 | 616.3 | 932.5 | 1,251.8 | 1,247.7 | 4,470.4 | 231.8 |
+| match_state_reliable | **204.1** | 214.5 | 339.7 | 518.8 | 518.5 | 457.2 | 966.2 | 1,234.4 | 1,308.1 | 30.4 |
+| match_state_unreliable | **195.8** | 202.3 | 364.3 | 441.3 | 455.3 | 418.2 | 928.2 | 1,265.0 | 1,332.3 | 29.2 |
+| per_player | **121.7** | 155.3 | 242.8 | 194.3 | 170.6 | 289.8 | 486.7 | 408.7 | 1,184.8 | 53.8 |
+| two_way | **59.3** | 78.6 | 73.0 | 71.0 | n/a | 104.0 | 148.9 | 171.8 | 592.2 | 30.5 |
 
-- **blink-plus vs stock Blink**: 1.1x to 2.5x less CPU in native mode,
-  1.7x to 8.8x less allocation, and almost none in many_events
-  (226 KB → 88 B per frame), identical wire bytes, and two-way
-  events that stock cannot do.
-- **blink-plus vs BlinkBlox**: about tied on CPU and allocation. BlinkBlox is a
-  little faster in burst and many_events; blink-plus is faster in client_input
-  and two_way. BlinkBlox's modules hold 1.5x to 3.5x more memory.
-- **Zap** is close to stock Blink on CPU and allocates the most. It has no f16,
-  so its match snapshot is 132 bytes bigger.
-- **Plain remotes look cheapest, but the mock flatters them.** Roblox's own C++
-  serialization of Luau tables is not timed, and their receive-side tables are
-  built by the mock's copy, so they show up only under "net alloc" (587 KB per
-  frame in match_state). They send 3x to 4x more bytes, and the unreliable match
-  snapshot (about 1977 bytes per call) is over Roblox's unreliable size limit,
-  so every one of those calls would be dropped.
+### CPU per frame, interpreter (µs, server + all clients)
 
-Schema differences between libraries and the remaining caveats are listed in
-[README.md](README.md#adapters).
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | **97.9** | 113.7 | 157.3 | 191.9 | 160.9 | 213.6 | 279.6 | 271.2 | 373.3 | 56.4 |
+| burst_sync | **65.0** | 83.1 | 157.6 | 135.9 | 114.1 | 185.9 | 266.3 | 268.8 | 358.3 | 55.2 |
+| client_input | **116.6** | 140.2 | 154.2 | 131.0 | 120.6 | 178.8 | 237.2 | 269.8 | 741.4 | 42.6 |
+| many_events | **238.5** | 385.1 | 698.5 | 769.8 | 882.8 | 1,119.7 | 1,418.3 | 1,396.5 | 6,578.7 | 296.1 |
+| match_state_reliable | **421.0** | 490.1 | 484.4 | 620.9 | 760.6 | 675.5 | 1,162.7 | 1,902.2 | 1,735.2 | 37.5 |
+| match_state_unreliable | **393.3** | 448.0 | 483.2 | 540.1 | 625.5 | 646.4 | 1,112.4 | 1,792.1 | 1,753.1 | 37.3 |
+| per_player | **172.7** | 213.5 | 302.6 | 236.4 | 221.5 | 371.4 | 548.6 | 503.2 | 1,593.8 | 90.7 |
+| two_way | **77.8** | 102.1 | 96.4 | 98.4 | n/a | 132.0 | 192.3 | 233.6 | 647.7 | 43.5 |
+
+### Receive cost per client, native (µs)
+
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | **43.43** | 44.08 | 52.23 | 90.97 | 94.46 | 96.18 | 160.61 | 111.35 | 117.06 | 16.16 |
+| burst_sync | **21.72** | 27.10 | 52.22 | 46.52 | 49.55 | 78.69 | 164.10 | 110.51 | 108.59 | 16.89 |
+| client_input | 0.10 | 0.10 | 0.10 | **0.10** | 0.11 | 0.10 | 0.10 | 0.11 | 0.14 | 0.10 |
+| many_events | **3.76** | 5.39 | 13.85 | 4.06 | 6.65 | 17.37 | 26.38 | 18.07 | 89.12 | 4.64 |
+| match_state_reliable | **4.04** | 4.17 | 6.67 | 9.80 | 10.11 | 9.06 | 20.38 | 15.84 | 22.71 | 0.29 |
+| match_state_unreliable | **3.85** | 3.95 | 7.17 | 9.30 | 9.71 | 8.36 | 19.58 | 16.09 | 23.28 | 0.27 |
+| per_player | **1.41** | 1.72 | 2.89 | 2.00 | 1.97 | 4.00 | 6.98 | 5.19 | 14.64 | 0.53 |
+| two_way | 0.33 | 0.42 | 0.41 | **0.26** | n/a | 0.54 | 1.08 | 0.83 | 3.16 | 0.19 |
+
+### Library allocations per frame (bytes, interpreter)
+
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | **38,408** | **38,408** | 38,472 | 360,192 | 337,438 | 60,800 | 117,816 | 128,090 | 46,034 | 0 |
+| burst_sync | **38,408** | **38,408** | 38,472 | 126,592 | 103,838 | 60,800 | 117,816 | 128,090 | 46,034 | 0 |
+| client_input | 34,100 | **33,924** | 35,172 | 75,856 | 66,044 | 39,952 | 74,280 | 62,634 | 80,364 | 0 |
+| many_events | **88** | **88** | 40,584 | 365,397 | 226,080 | 106,240 | 235,631 | 389,576 | 44,933 | 0 |
+| match_state_reliable | 328,246 | **328,164** | 356,267 | 700,313 | 674,500 | 329,200 | 582,747 | 657,976 | 356,399 | 0 |
+| match_state_unreliable | 328,464 | **328,055** | 356,103 | 557,561 | 554,944 | 329,200 | 582,693 | 657,976 | 356,507 | 0 |
+| per_player | 37,268 | **36,520** | 61,026 | 174,725 | 134,260 | 76,748 | 149,212 | 130,854 | 43,233 | 0 |
+| two_way | 720 | **16** | 1,792 | 22,408 | n/a | 9,584 | 56,496 | 36,608 | 58,316 | 0 |
+
+### Wire bytes per frame (all receivers, s2c + c2s)
+
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | 3,205 | 3,205 | 3,204 | 3,205 | 3,205 | 3,205 | 3,203 | 3,207 | **3,007** | 10,000 |
+| burst_sync | 3,205 | 3,205 | 3,204 | 3,205 | 3,205 | 3,205 | 3,203 | 3,207 | **3,007** | 10,000 |
+| client_input | 968 | 968 | **913** | 924 | 968 | 968 | 1,056 | 1,023 | **913** | 4,578 |
+| many_events | 3,696 | 3,696 | 3,652 | 3,696 | 3,696 | 3,696 | **3,608** | 3,740 | 3,652 | 12,672 |
+| match_state_reliable | **22,440** | **22,440** | 28,248 | 28,248 | **22,440** | 22,484 | 25,300 | 22,484 | 28,204 | 86,981 |
+| match_state_unreliable | **22,440** | **22,440** | 28,248 | 28,204 | **22,440** | 22,484 | 25,300 | 22,484 | 28,204 | 86,981 |
+| per_player | 2,595 | 2,551 | 2,639 | 2,551 | 2,595 | 2,639 | 2,771 | 2,595 | **2,507** | 8,931 |
+| two_way | 792 | 792 | 704 | 792 | n/a | 792 | **616** | 880 | 704 | 792 |
+
+### Client module memory (KB, code + state)
+
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | 20.7 | 59.7 | 128.9 | **16.1** | 34.4 | 4,178.1 | 196.0 | 1,278.7 | 827.0 | 7.0 |
+| burst_sync | 20.7 | 59.7 | 128.9 | **16.1** | 34.4 | 4,178.1 | 196.0 | 1,278.7 | 827.0 | 7.0 |
+| client_input | 18.4 | 45.5 | 143.0 | **14.9** | 16.9 | 4,181.5 | 197.3 | 1,284.7 | 852.5 | 5.1 |
+| many_events | **198.1** | 926.2 | 271.4 | 235.6 | 824.6 | 4,464.0 | 280.0 | 1,322.7 | 1,622.1 | 139.6 |
+| match_state_reliable | 29.8 | 67.6 | 144.9 | **20.8** | 38.9 | 4,184.5 | 198.8 | 1,286.5 | 882.0 | 5.2 |
+| match_state_unreliable | 29.8 | 67.6 | 144.9 | **20.8** | 38.9 | 4,184.5 | 198.8 | 1,286.5 | 882.0 | 5.2 |
+| per_player | 28.2 | 87.6 | 146.1 | **20.0** | 60.2 | 4,189.0 | 200.2 | 1,285.3 | 871.7 | 9.1 |
+| two_way | 18.2 | 56.7 | 135.8 | **12.9** | n/a | 4,175.0 | 194.0 | 1,278.9 | 831.9 | 3.9 |
+
+### Server module memory (KB, code + state)
+
+| scenario | plus | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync | remotes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | **30.3** | 67.6 | 135.9 | 34.4 | 31.1 | 307.3 | 205.4 | 1,291.7 | 889.7 | 5.8 |
+| burst_sync | **30.3** | 67.6 | 135.9 | 34.4 | 31.1 | 307.3 | 205.4 | 1,291.7 | 889.7 | 5.8 |
+| client_input | 23.0 | 78.1 | 139.5 | **20.0** | 34.6 | 310.0 | 206.7 | 1,295.1 | 891.1 | 5.8 |
+| many_events | **224.6** | 612.4 | 323.3 | 1,261.4 | 926.4 | 647.5 | 292.9 | 1,505.2 | 1,679.3 | 143.5 |
+| match_state_reliable | 44.5 | 83.2 | 141.3 | 63.9 | **38.1** | 313.0 | 207.9 | 1,296.8 | 922.3 | 5.8 |
+| match_state_unreliable | 44.5 | 83.2 | 141.3 | 63.9 | **38.1** | 313.0 | 207.9 | 1,296.8 | 922.3 | 5.8 |
+| per_player | **35.4** | 83.3 | 143.5 | 68.8 | 54.7 | 318.9 | 209.7 | 1,299.7 | 910.8 | 10.8 |
+| two_way | 35.9 | 86.0 | 131.8 | **24.1** | n/a | 303.0 | 203.5 | 1,287.8 | 870.0 | 4.2 |

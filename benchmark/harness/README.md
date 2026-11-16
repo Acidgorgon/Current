@@ -7,8 +7,8 @@ wire size of Roblox networking libraries on football-game-shaped traffic
 (40-50 player servers), and checks that every value received equals the value
 sent. Libraries plug in through **adapters**; the first adapter is
 [Blink](https://github.com/1Axen/blink) (stock v0.18.9 and the blink-plus
-fork). Further adapters: Zap, BlinkBlox and a plain-RemoteEvent baseline
-(`remotes`); see [Adapters](#adapters) for what each one does and how its
+fork). Further adapters: Zap, BlinkBlox, ByteNet, Warp, QuickNet, Lync, Packet and a
+plain-RemoteEvent baseline (`remotes`); see [Adapters](#adapters) for what each one does and how its
 schemas differ from Blink's, and [Adding a library](#adding-a-library).
 
 Everything runs in a plain Luau 0.700 VM (no Roblox, no Lune at run time)
@@ -214,6 +214,11 @@ does not), `tick` and `time` are real globals.
 | `blink` | Blink checkout | `.blink` schemas in `adapters/blink/schemas/`, compiled with `lune run init` from `src/CLI`. The reference definitions. |
 | `zap` | Zap checkout with `target/release/zap` (or a dir holding `zap`) | `.zap` schemas in `adapters/zap/schemas/`, compiled with the Zap CLI. Single* events expose `SetCallback`, Many* events `On`; both are handed out directly. |
 | `blinkblox` | BlinkBlox checkout | the Blink schemas with BlinkBlox's inbound limits raised (below), compiled from source with `lune run init` from `src/CLI`. Same public API as Blink. |
+| `bytenet` | ByteNet 0.4.x release (v0.4.3; `main` is an unfinished rewrite and is refused) | packets defined in `adapters/bytenet/schemas/<schema>.luau`. Enums and sets are custom `{read, write}` types (u8 index / u8 bitfield). |
+| `warp` | Warp 1.1.0-pre8 | schemas via `Schema.*`; enum and set via `Schema.custom_datatype`. The client pumps Warp's startup handshake inside `start()`. |
+| `quicknet` | QuickNet 0.4.0 | `D.literal` enums, `D.custom` u8 bitfield sets, `Vector3F16`. Rate limit raised with `:SetRateLimit(math.huge, 1)`. |
+| `lync` | Lync 4.0.x | int ranges, `enum`, `bitfield`, `str(0, 64)`, arrays and optionals. The client pumps Lync's hello/verdict handshake inside `start()`. |
+| `packet` | Packet 1.7 `MainModule` directory | Packet types; enums as `Types/Static1` u8 static indexes (the list is replaced at build time by `adapters/packet/Static1.luau`). |
 | `remotes` | none (`-`) | "no library" baseline: hand-written modules in `adapters/remotes/modules/<schema>/` make one RemoteEvent (UnreliableRemoteEvent where Blink's is Unreliable) per event under `ReplicatedStorage.Remotes` and fire the Luau values as they are. No serialization, no batching. |
 
 ```sh
@@ -221,8 +226,18 @@ does not), `tick` and `time` are real globals.
          --variant plus=blink:../.. \
          --variant zap=zap:$HOME/src/zap \
          --variant blinkblox=blinkblox:$HOME/src/BlinkBlox \
+         --variant bytenet=bytenet:$HOME/src/ByteNet \
+         --variant warp=warp:$HOME/src/Warp \
+         --variant quicknet=quicknet:$HOME/src/QuickNet \
+         --variant lync=lync:$HOME/src/Lync \
+         --variant packet=packet:$HOME/src/Packet/MainModule \
          --variant remotes=remotes:-
 ```
+
+Libraries are copied into `gen/<label>/` and patched there, never in their
+source directory. Patches go through a helper that fails unless the target
+text occurs exactly once. Each library is also copied a second time for the
+clients so their code heap is measured separately.
 
 Schema differences that affect wire size or work (everything else matches
 Blink's types, ranges, enums, `Type` and `Call` exactly):
@@ -254,6 +269,31 @@ Blink's types, ranges, enums, `Type` and `Call` exactly):
   used in both directions). The unreliable match snapshot is ~2 KB per call
   by the mock's estimate, so Roblox would drop every one
   (`wire.unreliable_oversize`).
+
+* **bytenet**: no f16, so `Vel` is an f32 vec3 (+132 bytes per snapshot);
+  u16 length prefixes on arrays and strings. `many_events` `(u8, u16)` pairs
+  are sent as a struct (one reused table). Every listener runs through
+  `task.spawn` on a reused thread. No patches.
+* **warp**: `Vel` is `Schema.vector3` (f16, like Blink). A 2-byte header and a
+  varint count per batch. Pairs are sent as a struct. Patches: the
+  8000-bytes-per-heartbeat inbound cap is lifted, and `const` becomes `local`
+  in two files (`const` does not parse in Luau 0.700). Its ~1.3 MB module heap
+  is a 65536-entry f16 lookup table.
+* **quicknet**: `MaxPacketSize` and `MaxCallsPerFrame` are set to `math.huge`
+  in its Config, and `const` becomes `local`. The default 2 MB client
+  allocation is kept, which is most of its ~4 MB client heap. It also
+  allocates about 2 MB per player on the server at join; per-player state is
+  not counted in `server_module` (about 88 MB here).
+* **lync**: no f16 (`Vel` is f32 vec3). Pairs are sent as a struct. Flushes from
+  PostSimulation. No patches.
+* **packet**: no f16 (`Vel` is `Vector3F24`, 9 bytes). No unreliable channel,
+  so its "unreliable" scenarios run reliably. Sets are structs of six
+  `Boolean8`; optionals use `Packet.Any`, which adds a type tag. Listener calls
+  are deferred. Patch: the 8000-bytes-per-heartbeat inbound cap is lifted.
+* Every library except Zap and BlinkBlox supports two-way events natively.
+  `fork_only` in `scenarios/manifest.json` only means stock Blink cannot build
+  `two_way`; any other library that failed to build it would also be reported
+  as skipped.
 
 ## Scenarios
 

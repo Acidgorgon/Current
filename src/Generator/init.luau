@@ -730,6 +730,8 @@ function Declarations.Event(Declaration: Parser.Event)
 	local Index = Channel.Count
 	local Queue = `Queue.{Reliability}[{Index}]`
 	local Connection = `Events.{Reliability}[{Index}]`
+	--> The receive handlers find their listeners through a local alias of Events.<Channel>
+	local ListenersLocal = `Events{Reliability}[{Index}]`
 
 	--> ReuseReceiveTables / ReuseTables: listened (not polled) events may decode into the
 	--> previous value's tables. ReuseSlots collects the slots holding this event's root tables.
@@ -827,7 +829,7 @@ function Declarations.Event(Declaration: Parser.Event)
 		end
 
 		if IsSingle then
-			Handler:Line(`local Listener = {Connection}`)
+			Handler:Line(`local Listener = {ListenersLocal}`)
 		end
 
 		if IsReliable then
@@ -835,7 +837,7 @@ function Declarations.Event(Declaration: Parser.Event)
 			if IsSingle then
 				ListenerBound = Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1)
 			else
-				Handler:Line(`local Listeners = {Connection}`)
+				Handler:Line(`local Listeners = {ListenersLocal}`)
 				ListenerBound = Handler:Compare(`#Listeners`, "0", "Greater")
 					:Iterator("_", "Listener", "Listeners")
 					:Lines(CallListener.Content, Handler.Indent + 2)
@@ -850,7 +852,7 @@ function Declarations.Event(Declaration: Parser.Event)
 			if IsSingle then
 				Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1):End()
 			else
-				Handler:Iterator("_", "Listener", Connection):Lines(CallListener.Content, Handler.Indent + 1):End()
+				Handler:Iterator("_", "Listener", ListenersLocal):Lines(CallListener.Content, Handler.Indent + 1):End()
 			end
 		end
 
@@ -1908,6 +1910,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		(if Options.SyncValidation then SYNC_VALIDATION_BODY else {}),
 		(if ReuseSlotCount > 0 then { `local {REUSED_TABLES}: \{[number]: any\} = \{\}\n` } else {}),
 		ReuseSpares,
+		{ "local EventsReliable, EventsUnreliable = Events.Reliable, Events.Unreliable\n" },
 		Events.DumpLines(),
 		LuauTypes.DumpLines(),
 		{ "local EnumTables: {[number]: any} = {}\n", ENUM_TABLES_MARKER },

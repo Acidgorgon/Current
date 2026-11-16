@@ -226,8 +226,11 @@ local function StepReplication()
     else
         Private = false
         local Broadcast: buffer? = nil
+        local BroadcastInstanceCount = #BroadcastInstances
         for Player, Writer in PlayersMap do
-            if Writer.Cursor == 0 and Writer.Synced == 0 then
+            local Cursor = Writer.Cursor
+            local Synced = Writer.Synced
+            if Cursor == 0 and Synced == 0 then
                 if BroadcastSize > 0 then
                     if Broadcast == nil then
                         Broadcast = Pack(Home)
@@ -237,18 +240,30 @@ local function StepReplication()
                 continue
             end
 
-            Load(Writer)
-            CatchUp(Writer)
-            Save(Writer)
-
-            if Writer.Cursor > 0 then
-                Reliable:FireClient(Player, Pack(Writer), Writer.Instances)
+            --> Append the end of the broadcast log this writer has not seen yet
+            if Synced ~= BroadcastSize or Writer.SyncedInstances ~= BroadcastInstanceCount then
+                Load(Writer)
+                CatchUp(Writer)
+                Save(Writer)
+                Cursor = SendCursor
             end
-
-            Writer.Cursor = 0
             Writer.Synced = 0
             Writer.SyncedInstances = 0
-            table.clear(Writer.Instances)
+
+            if Cursor > 0 then
+                local Instances = Writer.Instances
+                if REUSE_SEND_BUFFERS then
+                    Reliable:FireClient(Player, Pack(Writer), Instances)
+                else
+                    local Out = buffer.create(Cursor)
+                    buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
+                    Reliable:FireClient(Player, Out, Instances)
+                end
+                Writer.Cursor = 0
+                if #Instances > 0 then
+                    table.clear(Instances)
+                end
+            end
         end
     end
 

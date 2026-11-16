@@ -3,8 +3,11 @@ return [[local Invocations = 0
 --> Send state. The Send* upvalues are the "loaded" writer that the generated
 --> serializers write into. A Writer record holds a writer's state while it is
 --> not loaded. Load/Save copy fields in and out and never allocate.
---> At rest the Home writer is always loaded: on the client it is the reliable
---> outbox, on the server it is the broadcast log shared by every player.
+--> Home is the reliable outbox on the client and the broadcast log shared by
+--> every player on the server. Current is the writer whose state is in the
+--> Send* upvalues: always Home on the client; on the server the writer of the
+--> last player sent to stays loaded until a send needs another one, so a run
+--> of Fire calls to one player pays for one switch instead of one per call.
 local SendSize = 64
 local SendOffset = 0
 local SendCursor = 0
@@ -55,6 +58,7 @@ end
 
 local Home: Writer = NewWriter()
 local Scratch: Writer = NewWriter()
+local Current: Writer = Home
 
 SendBuffer = Home.Buffer
 SendInstances = Home.Instances
@@ -131,7 +135,7 @@ end
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local BeginScratch
 BeginScratch = function()
-    Save(Home)
+    Save(Current)
     Load(Scratch)
 end
 
@@ -142,7 +146,7 @@ EndScratch = function()
     Scratch.Size = SendSize
     Scratch.Buffer = SendBuffer
     table.clear(Scratch.Instances)
-    Load(Home)
+    Load(Current)
 end
 
 --> Async listeners run on a reused thread instead of a new coroutine per event.

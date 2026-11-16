@@ -540,9 +540,9 @@ function Declarations.Event(Declaration: Parser.Event)
 		local ExceptValues = `Except: Player, {Values}`
 
 		if IsReliable then
-			FireFunction(Casing.Fire, PlayerValues, "local Writer = BeginPlayer(Player)", "EndPlayer(Writer)")
-			--> The broadcast log is always loaded on the server
-			FireFunction(Casing.FireAll, Values)
+			--> The last writer sent to stays loaded, so repeated sends to one player or to all skip the switch
+			FireFunction(Casing.Fire, PlayerValues, "if PlayersMap[Player] ~= Current then UsePlayer(Player) end")
+			FireFunction(Casing.FireAll, Values, "if Current ~= Home then Switch(Home) end")
 			FireFunction(Casing.FireList, ListValues, "BeginScratch()", "SendReliableList(List)")
 			FireFunction(Casing.FireExcept, ExceptValues, "local Writer = BeginExcept(Except)", "EndExcept(Writer)")
 		else
@@ -663,7 +663,7 @@ function Declarations.Function(Declaration: Parser.Function)
 			Blocks.Function(Connection, `Player: Player, {DataValues}, InvocationIdentifier: number`, "()", true)
 				:Line(`local {ReturnValues};`)
 				:Lines(Serialize.Content, 1)
-				:Line("local Writer = BeginPlayer(Player)")
+				:Line("if PlayersMap[Player] ~= Current then UsePlayer(Player) end")
 				:Compare("Success", "true", "Not")
 				:Line(`local Position = Allocate({IndexBytes + 2})`)
 				:Line(`buffer.write{IndexType}(SendBuffer, Position, {Index})`)
@@ -673,7 +673,6 @@ function Declarations.Function(Declaration: Parser.Function)
 				:Branch("Default")
 				:Line(`{Util.GetPath(ReturnIdentifier, true, Scope)}({ReturnArguments}, InvocationIdentifier)`)
 				:End()
-				:Line("EndPlayer(Writer)")
 				:End()
 
 		local Listener = Blocks.Function(Casing.On, `Listener: (Player, {DataTypes}) -> ({ReturnTypes})`, "()", true)

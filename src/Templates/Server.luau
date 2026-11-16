@@ -39,9 +39,14 @@ CreateWriter = function(Player: Player, Synced: number, SyncedInstances: number)
     return Writer
 end
 
-local function GetWriter(Player: Player): Writer
-    return PlayersMap[Player] or CreateWriter(Player, 0, 0)
-end
+--> Set when any player's writer may hold something the broadcast log does not
+--> (a private event, a FireExcept mark, a mid-frame join). While it is false,
+--> StepReplication sends the log to everyone with one FireAllClients.
+local Private = false
+
+--> Players that left. A send to one after PlayerRemoving goes to a detached
+--> writer that is dropped, instead of re-adding them to PlayersMap for good.
+local Departed: {[Player]: boolean} = setmetatable({} :: any, { __mode = "k" })
 
 --> Appends the part of the broadcast log the loaded writer has not seen yet.
 --> Home must be saved before calling.
@@ -65,22 +70,32 @@ CatchUp = function(Writer: Writer)
     end
 end
 
---> Loads a player's writer with the broadcast log caught up. Pair with EndPlayer.
+--> Makes Writer the loaded writer. A player's writer is caught up with the
+--> broadcast log first, so events stay in the order they were sent.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
-local BeginPlayer
-BeginPlayer = function(Player: Player): Writer
-    Save(Home)
-    local Writer = PlayersMap[Player] or CreateWriter(Player, 0, 0)
+local Switch
+Switch = function(Writer: Writer)
+    Save(Current)
     Load(Writer)
-    CatchUp(Writer)
-    return Writer
+    Current = Writer
+    if Writer ~= Home then
+        Private = true
+        CatchUp(Writer)
+    end
 end
 
+--> Cold path of a send to one player: their writer is not the loaded one.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
-local EndPlayer
-EndPlayer = function(Writer: Writer)
-    Save(Writer)
-    Load(Home)
+local UsePlayer
+UsePlayer = function(Player: Player)
+    local Writer = PlayersMap[Player]
+    if Writer == nil then
+        Writer = CreateWriter(Player, 0, 0)
+        if Departed[Player] then
+            PlayersMap[Player] = nil
+        end
+    end
+    Switch(Writer)
 end
 
 --> FireExcept: catch the excluded player up to the log, then mark them as past the new event
@@ -88,12 +103,11 @@ end
 local BeginExcept
 BeginExcept = function(Except: Player): Writer?
     local Writer = PlayersMap[Except]
-    if Writer ~= nil then
-        Save(Home)
-        Load(Writer)
-        CatchUp(Writer)
-        Save(Writer)
-        Load(Home)
+    if Writer ~= nil and Writer ~= Current then
+        Switch(Writer)
+    end
+    if Current ~= Home then
+        Switch(Home)
     end
     return Writer
 end
@@ -114,15 +128,16 @@ SendReliableList = function(List: {Player})
     Save(Scratch)
     local Size, Source, Instances = SendCursor, SendBuffer, SendInstances
     local InstanceCount = #Instances
-    Load(Home)
+    Load(Current)
     for _, Player in List do
-        local Writer = BeginPlayer(Player)
+        if PlayersMap[Player] ~= Current then
+            UsePlayer(Player)
+        end
         local Position = Allocate(Size)
         buffer.copy(SendBuffer, Position, Source, 0, Size)
         if InstanceCount > 0 then
             table.move(Instances, 1, InstanceCount, #SendInstances + 1, SendInstances)
         end
-        EndPlayer(Writer)
     end
     Scratch.Cursor = 0
     table.clear(Instances)
@@ -182,34 +197,33 @@ AddExistingPlayers()
 Players.PlayerAdded:Connect(function(Player)
     --> Players that join mid-frame skip broadcasts sent before they joined
     if PlayersMap[Player] == nil then
-        CreateWriter(Player, SendCursor, #SendInstances)
+        Save(Current)
+        CreateWriter(Player, Home.Cursor, #Home.Instances)
+        if Home.Cursor > 0 then
+            Private = true
+        end
     end
 end)
 
 Players.PlayerRemoving:Connect(function(Player)
     PlayersMap[Player] = nil
+    Departed[Player] = true
 end)
 
 local function StepReplication()
-    Save(Home)
+    Save(Current)
+    Current = Home
 
     local BroadcastSize = Home.Cursor
     local BroadcastInstances = Home.Instances
 
-    --> If nobody has private data this frame, one FireAllClients covers everyone
-    local Private = false
-    for _, Writer in PlayersMap do
-        if Writer.Cursor > 0 or Writer.Synced > 0 then
-            Private = true
-            break
-        end
-    end
-
     if not Private then
+        --> Nobody has private data this frame: one FireAllClients covers everyone
         if BroadcastSize > 0 then
             Reliable:FireAllClients(Pack(Home), BroadcastInstances)
         end
     else
+        Private = false
         local Broadcast: buffer? = nil
         for Player, Writer in PlayersMap do
             if Writer.Cursor == 0 and Writer.Synced == 0 then

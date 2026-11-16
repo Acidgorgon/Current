@@ -21,7 +21,7 @@ What Current adds on top of Blink:
   ```
 
   Data sent by clients is validated on the server exactly like a `From: Client` event. See [Two-way events](https://acidgorgon.github.io/Current/guide/two-way-events).
-- **Faster generated code.** In the benchmark harness Current is the fastest of the nine serializing libraries tested in every scenario, and 2.5x faster than upstream Blink 0.18.9 on a 44-player match snapshot and 3.1x on 120 events per frame. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
+- **Faster generated code.** In the benchmark harness Current is the fastest of the nine serializing libraries tested in every scenario, and 2.8x faster than upstream Blink 0.18.9 on a 44-player match snapshot (6.2x with `ReuseReceiveTables`) and 3.4x on 120 events per frame, with its server hardening on. Results: [benchmark/harness/RESULTS.md](./benchmark/harness/RESULTS.md).
 
 # Install
 

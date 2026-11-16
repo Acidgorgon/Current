@@ -22,7 +22,7 @@ hero:
 features:
   - icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
     title: Fastest in the benchmarks
-    details: The fastest of nine serializing libraries in every benchmark scenario, 2.5x faster than upstream Blink on a 44-player match snapshot and 3.1x on 120 events per frame.
+    details: The fastest of nine serializing libraries in every benchmark scenario, 2.8x faster than upstream Blink on a 44-player match snapshot (6.2x with ReuseReceiveTables) and 3.4x on 120 events per frame.
     link: /guide/performance
     linkText: See the numbers
   - icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4 3 8l4 4"/><path d="M3 8h14"/><path d="m17 20 4-4-4-4"/><path d="M21 16H7"/></svg>

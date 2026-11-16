@@ -1,6 +1,6 @@
 # Performance
 
-Current exists to make Blink's generated code faster without changing what it sends. Lower bandwidth means lower ping for players; lower CPU means more frame budget for your game. This page summarises the benchmark; the full tables are in [RESULTS.md](https://github.com/Acidgorgon/Current/blob/main/benchmark/harness/RESULTS.md).
+Current exists to make Blink's generated code faster without making it send more. Lower bandwidth means lower ping for players; lower CPU means more frame budget for your game. This page summarises the benchmark; the full tables are in [RESULTS.md](https://github.com/Acidgorgon/Current/blob/main/benchmark/harness/RESULTS.md).
 
 ## The benchmark
 
@@ -8,7 +8,8 @@ The harness in [`benchmark/harness/`](https://github.com/Acidgorgon/Current/tree
 
 | Label | Library |
 |---|---|
-| current | Current |
+| current | Current, default options |
+| current-reuse | Current with [`ReuseReceiveTables`](/reference/options#reusereceivetables) on |
 | blinkblox | BlinkBlox 1.4.0, another Blink fork |
 | bytenet | ByteNet 0.4.3 |
 | zap | Zap 0.6.29 |
@@ -19,32 +20,33 @@ The harness in [`benchmark/harness/`](https://github.com/Acidgorgon/Current/tree
 | lync | Lync 4.0 |
 | remotes | plain RemoteEvents, one per event, no serialization |
 
-Everything runs in a plain Luau 0.700 VM with a Roblox mock: 7 runs per library (median shown), 600 frames after 120 warm-up frames.
+Everything runs in a plain Luau 0.700 VM with a Roblox mock: 7 runs per library (median shown), 600 frames after 120 warm-up frames. Current runs with its [server hardening](./security) on (packet limits, value checks, one protected call per packet); only the per-second budgets are off, because the harness runs frames much faster than real time.
 
 ## CPU per frame
 
 Server plus all 44 clients, native codegen, in microseconds. Lower is better; **bold** is the best serializing library.
 
-| Scenario | current | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| burst_async | **58.3** | 74.5 | 112.0 | 154.8 | 130.7 | 147.0 | 236.2 | 198.3 | 243.2 |
-| burst_sync | **37.4** | 62.5 | 111.6 | 114.2 | 87.2 | 123.7 | 242.3 | 196.4 | 231.8 |
-| client_input | **91.6** | 107.4 | 116.7 | 99.3 | 99.2 | 137.0 | 184.5 | 197.0 | 622.4 |
-| many_events | **198.4** | 291.7 | 659.2 | 551.1 | 616.3 | 932.5 | 1,251.8 | 1,247.7 | 4,470.4 |
-| match_state_reliable | **204.1** | 214.5 | 339.7 | 518.8 | 518.5 | 457.2 | 966.2 | 1,234.4 | 1,308.1 |
-| match_state_unreliable | **195.8** | 202.3 | 364.3 | 441.3 | 455.3 | 418.2 | 928.2 | 1,265.0 | 1,332.3 |
-| per_player | **121.7** | 155.3 | 242.8 | 194.3 | 170.6 | 289.8 | 486.7 | 408.7 | 1,184.8 |
-| two_way | **59.3** | 78.6 | 73.0 | 71.0 | n/a | 104.0 | 148.9 | 171.8 | 592.2 |
+| Scenario | current | current-reuse | blinkblox | bytenet | zap | stock | quicknet | packet | warp | lync |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| burst_async | 54.7 | **43.0** | 73.5 | 109.4 | 157.7 | 135.5 | 147.9 | 224.8 | 189.7 | 229.0 |
+| burst_sync | 32.3 | **27.1** | 55.8 | 116.6 | 112.4 | 89.8 | 133.5 | 235.9 | 190.3 | 242.3 |
+| client_input | 92.5 | **82.3** | 129.9 | 133.3 | 108.1 | 106.5 | 146.8 | 208.0 | 203.9 | 674.7 |
+| many_events | **206.2** | 211.4 | 363.8 | 676.4 | 667.8 | 695.7 | 967.0 | 1,264.6 | 1,306.1 | 5,378.7 |
+| match_state_reliable | 185.8 | **84.2** | 216.3 | 341.7 | 509.1 | 525.9 | 441.5 | 937.4 | 1,232.6 | 1,341.2 |
+| match_state_unreliable | 176.4 | **76.9** | 205.4 | 346.0 | 445.0 | 484.0 | 430.3 | 933.2 | 1,298.2 | 1,343.8 |
+| per_player | 105.5 | **95.6** | 169.2 | 302.6 | 235.3 | 175.0 | 288.3 | 474.6 | 394.4 | 1,340.3 |
+| two_way | **70.2** | 80.4 | 81.4 | 74.1 | 71.7 | n/a | 117.0 | 167.7 | 211.3 | 598.1 |
 
-`n/a`: upstream Blink has no two-way events. Plain RemoteEvents are left out of this table because the mock cannot time Roblox's own C++ serialization of the tables they send, so their CPU numbers are only a lower bound.
+`n/a`: upstream Blink has no two-way events. On `two_way` nothing is reused, so `current-reuse` runs exactly the same code as `current`: the gap between them there is run-to-run noise. Plain RemoteEvents are left out of this table because the mock cannot time Roblox's own C++ serialization of the tables they send, so their CPU numbers are only a lower bound.
 
 ## Summary
 
-- **CPU.** Current is the fastest library in every scenario, in native and interpreted mode. BlinkBlox is closest: 3–5% behind on the match snapshots and 17–67% behind elsewhere. Against upstream Blink, Current is **2.5x faster** on the match snapshot, **3.1x** on 120 events per frame and **2.3x** on a 200-event burst.
-- **Server cost.** The server part of the frame drops furthest, because a broadcast is written once whatever the player count: 6.8x less than upstream Blink for the snapshot to 44 players, 20x for 120 events (1.5x for per-player sends, the weakest case).
-- **Allocations.** Tied with BlinkBlox for the least among the buffer libraries; half of upstream Blink's on the snapshot, and almost none for many small events. [`ReuseSendBuffers`](/reference/options#reusesendbuffers) and [`ReuseReceiveTables`](/reference/options#reusereceivetables) remove most of what is left in steady traffic.
-- **Bandwidth.** Tied for the smallest snapshot with upstream Blink and BlinkBlox (16-bit float velocities). Libraries without `f16` send about 25% more. Plain RemoteEvents send 3–4x more bytes, and their unreliable snapshot (about 2 KB per call) is over Roblox's unreliable size limit, so every one would be dropped.
-- **Memory.** Current's modules are smaller than upstream Blink's and far smaller than BlinkBlox, Warp, QuickNet and Lync. Zap's client modules are a little smaller still.
+- **CPU.** With default options Current is the fastest of the nine serializing libraries in every scenario, in native and interpreted mode (by 2% over Zap on `two_way` and 4% over upstream Blink on interpreted `client_input`, the two close calls). Against upstream Blink it is **2.8x faster** on the match snapshot, **3.4x** on 120 events per frame and 2.5–2.8x on a 200-event burst. BlinkBlox is the closest other library: 16% behind on the match snapshots and `two_way`, 34–76% behind elsewhere.
+- **ReuseReceiveTables.** When clients receive the same shape every frame, reusing their tables removes most of what is left: the match snapshot drops from 186 to 84 µs per frame, **6.2x faster than upstream Blink** and 2.6x faster than BlinkBlox, and allocates 513 bytes per frame instead of 328 KB.
+- **Server and client.** The server part of the frame drops furthest, because a broadcast is written once whatever the player count: 31.8x less than upstream Blink for 120 events and 7.1x for the reliable snapshot to 44 players. Each client decodes the snapshot 2.8–3.0x faster than upstream Blink, and 6.8–7.6x with `ReuseReceiveTables`.
+- **Allocations.** About the same as BlinkBlox and 2.1x less than upstream Blink on the reliable snapshot with default options; with [`ReuseSendBuffers`](/reference/options#reusesendbuffers) and [`ReuseReceiveTables`](/reference/options#reusereceivetables) steady traffic allocates almost nothing.
+- **Bandwidth.** The smallest snapshot (16-bit float velocities, like upstream Blink and BlinkBlox, and no empty instance list). Libraries without `f16` send about 26% more. Plain RemoteEvents send 3–5x more bytes, and their unreliable snapshot (about 2 KB per call) is over Roblox's unreliable size limit, so every one would be dropped.
+- **Memory.** Current's client modules are smaller than upstream Blink's and far smaller than BlinkBlox, Warp, QuickNet and Lync; Zap's are a little smaller still. Server modules include the security checks, so on small schemas they are up to 17 KB larger than upstream Blink's.
 
 ::: info Reading the numbers
 Runs are interleaved library by library, so ratios between libraries are reliable. Absolute microseconds are only comparable within one run.
@@ -70,7 +72,8 @@ cd benchmark/harness
 
 # Several libraries, runs interleaved (use this for comparisons)
 ./run.sh --variant stock=blink:$HOME/src/blink-stock \
-         --variant current=blink:../..
+         --variant current=blink:../.. \
+         --variant current-reuse=blink+reuse:../..
 
 # Markdown comparison of two result files
 python3 compare.py results/stock.json results/current.json --mode both

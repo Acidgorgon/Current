@@ -88,6 +88,7 @@ export type Options = {
 	ManualReplication: boolean?,
 	RemoteScope: string?,
 	ReuseSendBuffers: boolean?,
+	ReuseReceiveTables: boolean?,
 }
 
 export type Body = Node<"Body", {
@@ -166,6 +167,7 @@ export type Event = Node<"Event", {
 	From: "Client" | "Server" | "Both",
 	Type: "Reliable" | "Unreliable",
 	Call: "SingleSync" | "SingleAsync" | "ManySync" | "ManyAsync" | "Polling",
+	ReuseTables: boolean?,
 	Data: (TypeNode | Tuple)?,
 }, {}>
 
@@ -197,6 +199,7 @@ local OPTIONS: { [string]: Lexer.Types } = {
 	ManualReplication = "Boolean",
 	RemoteScope = "String",
 	ReuseSendBuffers = "Boolean",
+	ReuseReceiveTables = "Boolean",
 }
 
 local EVENT: { EventOption } = {
@@ -204,6 +207,7 @@ local EVENT: { EventOption } = {
 	{ Key = "Type", Type = "Identifier", Values = { "Reliable", "Unreliable" } },
 	{ Key = "Call", Type = "Identifier", Values = { "SingleSync", "SingleAsync", "ManySync", "ManyAsync", "Polling" } },
 	{ Key = "Poll", Type = "Boolean", Values = { true, false }, Optional = true },
+	{ Key = "ReuseTables", Type = "Boolean", Values = { true, false }, Optional = true },
 	{ Key = "Data", Type = "Identifier", Values = {}, Optional = true },
 }
 
@@ -1172,6 +1176,7 @@ function Parser.Event(self: Parser, Name: Token): Event
 			From = Structure.From,
 			Type = Structure.Type,
 			Call = Call,
+			ReuseTables = Structure.ReuseTables,
 			Data = Structure.Data,
 		},
 		Tokens = {},

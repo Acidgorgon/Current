@@ -75,6 +75,44 @@ the same buffer, so steady traffic (a fixed-size match state broadcast, per-play
 from frame to frame) creates almost no garbage. It relies on Roblox copying a buffer's contents when a remote
 is fired, which is how remotes serialize their arguments.
 
+## `ReuseReceiveTables`
+Default: `false`
+
+When `true`, a listened event decodes each value into the tables of its previous value instead of allocating new
+ones: structs, arrays, maps and sets, and those nested inside them, are overwritten in place. For steady traffic
+(for example a match state received every frame) this removes all the garbage the receiving side makes. It can be
+turned on or off for a single event with the [`ReuseTables`](./5-events#reusetables) field.
+```blink copy
+option ReuseReceiveTables = true
+```
+
+<Callout type="warning">
+    A listener receives a table that **the next value of the same event overwrites**. Read what you need while the
+    listener runs, and copy anything you keep (`table.clone`, or the fields themselves) instead of storing the table
+    or any table inside it. Do not modify it.
+</Callout>
+
+When the table stays valid:
+* `Sync` listeners: until the listener returns.
+* `Async` listeners: until the listener returns. If it yields, Blink sees that its thread did not come back and
+  leaves that value alone: the next value gets new tables, so the yielded listener's value stays intact until it
+  finishes (but the value is still overwritten if you store it and read it after the listener finished).
+* Values that arrive before a listener is connected are queued with their own tables.
+* `Polling` events never reuse tables: their values wait in a queue.
+* Every listener of a `Many` event receives the same table, as without this option.
+* On the server each player has their own tables: a value is only overwritten by the same player's next value of
+  the event, not by another player's.
+
+How values are updated:
+* Arrays keep their table: items are overwritten, and a shorter array has its tail removed.
+* Maps keep their table: it is emptied and refilled, so keys that are no longer sent are gone.
+* Optional fields are set to `nil` when absent.
+* Tagged enums keep their table only while the variant stays the same.
+* Tables that leave a value (the tail of an array that got shorter, the values of a map, an optional struct that
+  became `nil`) are kept and used for later values, so a value whose shape changes does not allocate either.
+* Values that are not tables (numbers, strings, vectors, enums, instances) are unaffected. `buffer` values and
+  Roblox types such as `CFrame` are still created for every value.
+
 ## `RemoteScope`
 Default: `""`
 

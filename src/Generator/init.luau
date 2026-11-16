@@ -93,6 +93,47 @@ local IndexBytes = 1
 local Generators = {}
 local Declarations = {}
 
+--> ReuseReceiveTables: while an event's read is generated in reuse mode, decoded tables are
+--> taken from the previous value (the Source of each table) instead of allocated. The root
+--> tables live in ReusedTables[slot]; nested ones are found through their parent. Tables that
+--> leave the value (cut array tails, cleared map entries, optional fields that became nil) go
+--> to a spare list per site, ReusedTables[slot] too, and are taken from it before allocating.
+local ReuseSlotCount = 0
+local ReuseSpares: { string } = {}
+local REUSED_TABLES = "ReusedTables"
+
+--> Where reuse mode finds the previous table of a value: Get reads it (or takes a spare),
+--> Set (when given) is where a new table is stored, Spare is a list to take one from before
+--> allocating.
+type Source = {
+	Get: string,
+	Set: string?,
+	Spare: string?,
+}
+
+local function NewReuseSlot(): string
+	local Slot = `{REUSED_TABLES}[{ReuseSlotCount}]`
+	ReuseSlotCount += 1
+	return Slot
+end
+
+local function NewSpareList(): string
+	local Slot = NewReuseSlot()
+	table.insert(ReuseSpares, `{Slot} = \{\}\n`)
+	return Slot
+end
+
+--> Where an event keeps the root table of a value. The server keeps one per player (weak keys,
+--> so leaving players are collected): a value is only overwritten by the same player's next one.
+local function NewRootSlot(): string
+	local Slot = NewReuseSlot()
+	if Context == "Server" then
+		table.insert(ReuseSpares, `{Slot} = setmetatable(\{\}, \{ __mode = "k" \})\n`)
+		return `{Slot}[Player]`
+	end
+	return Slot
+end
+
 --> Fire method factories, emitted only when used. Each takes an event's serializer and
 --> returns the method, so every event shares these few prototypes. The "1" variants
 --> skip vararg forwarding for single-value events on the hot reliable paths.
@@ -262,6 +303,78 @@ local function GetEnumTables(Enums: { string }): (string, string)
 	return `EnumTables[{Id * 2}]`, `EnumTables[{Id * 2 + 1}]`
 end
 
+--> Whether a decoded value of this type is a table (the types reuse can recycle)
+local function IsTableType(Declaration: Type): boolean
+	local Kind = Declaration.Type
+	if Kind == "Optional" then
+		return IsTableType((Declaration :: Parser.Optional).Value.Of)
+	end
+	return Kind == "Struct" or Kind == "Array" or Kind == "Map" or Kind == "Set" or Kind == "TagEnum"
+end
+
+--> A struct whose fields hold no nested struct, array, map or tagged enum, and few enough of
+--> them to keep in registers
+local function IsFlatStruct(Declaration: Parser.Struct): boolean
+	local Fields = Declaration.Value.Values
+	if #Fields == 0 or #Fields > 32 then
+		return false
+	end
+	for _, Field in Fields do
+		local Of = Field :: Type
+		if Of.Type == "Optional" then
+			Of = (Of :: Parser.Optional).Value.Of
+		end
+		if Of.Type ~= "Primitive" and Of.Type ~= "Enum" and Of.Type ~= "Set" then
+			return false
+		end
+	end
+	return true
+end
+
+--> Whether a decoded value of this type can be nil (array items of such types can leave holes)
+local function CanBeNil(Declaration: Type): boolean
+	if Declaration.Type == "Optional" then
+		return true
+	elseif Declaration.Type == "Primitive" then
+		local Kind = (Declaration :: Parser.Primitive).Tokens.Primitive.Value
+		return Kind == "Instance" or Kind == "unknown"
+	end
+	return false
+end
+
+--> Whether reuse mode keeps a spare list for tables of this type. Not for tagged enums: a
+--> spare of another variant could not be used, so the list would only grow.
+local function UsesSpares(Declaration: Type): boolean
+	local Kind = Declaration.Type
+	return Kind == "Struct" or Kind == "Array" or Kind == "Map" or Kind == "Set"
+end
+
+--> Reuse mode: Variable takes the table at Source.Get or, when there is none (or Guard holds), a
+--> spare or a new one from Constructor, which is stored into Source.Set. Struct fields are
+--> decoded in place (Get == Set == Variable).
+local function ReuseTable(Read: Blocks.Block, Variable: string, Source: Source, Constructor: string, Guard: string?)
+	local Condition = `not {Variable}{Guard and ` or {Guard}` or ""}`
+	local New = if Source.Spare and not Guard then `table.remove({Source.Spare}) or {Constructor}` else Constructor
+	if Source.Get ~= Variable then
+		Read:Line(`{Read:Declare(Variable)} = {Source.Get}`)
+	end
+	Read:Line(`if {Condition} then`)
+	Read:Line(`{Variable} = {New}`, Read.Indent + 1)
+	if Source.Set and Source.Set ~= Variable then
+		Read:Line(`{Source.Set} = {Variable}`, Read.Indent + 1)
+	end
+	Read:Line("end")
+end
+
+--> The Source of a nested table decoded in place, at a struct field
+local function InPlace(Variable: string): Source
+	return { Get = Variable, Set = Variable }
+end
+
+local function IsFieldAccess(Variable: string): boolean
+	return string.find(Variable, "[%.%[]") ~= nil
+end
+
 local function BitIndexToHex(Index: number): string
 	return `0x{string.format("%x", 2 ^ Index)}`
 end
@@ -280,14 +393,28 @@ function Declarations.Primitive(
 	Generator.Generate(Declaration, Variable, Read, Write, Options.WriteValidations)
 end
 
-function Declarations.Set(Declaration: Parser.Set, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Set(
+	Declaration: Parser.Set,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?
+)
 	local Value = Declaration.Value
 	local Flags = Value.Values
 
 	do
-		--> Read Flags
-
-		Read:Line(`{Read:Declare(Variable)} = \{\}`)
+		--> Read Flags: a constant constructor (one allocation, keys pre-sized), every flag is overwritten
+		local Template = {}
+		for _, Flag in Flags do
+			table.insert(Template, `{FormatKey(Flag)} = false`)
+		end
+		local Constructor = `\{{table.concat(Template, ", ")}\}`
+		if Source then
+			ReuseTable(Read, Variable, Source, Constructor)
+		else
+			Read:Line(`{Read:Declare(Variable)} = {Constructor}`)
+		end
 
 		local Remaining = #Flags
 		local FlagIndex = 1
@@ -342,8 +469,31 @@ function Declarations.Enum(Declaration: Parser.Enum, Read: Blocks.Block, Write: 
 	if #Enums > ENUM_TABLE_THRESHOLD then
 		local ReadTable, WriteTable = GetEnumTables(Enums)
 		Types.u8.Read(`Index`, Read)
-		Read:Line(`{Read:Declare(Variable)} = {ReadTable}[Index + 1] :: any`)
-		Read:Compare(Variable, "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+
+		--> Inside a loop, the lookup table is fetched once into a local at the top of the function
+		local Root, InLoop = Read, false
+		while Root.Parent do
+			InLoop = InLoop or Root.Unique ~= "BLOCK_START"
+			Root = Root.Parent
+		end
+		if InLoop then
+			local Local = string.gsub(ReadTable, "EnumTables%[(%d+)%]", "EnumRead_%1")
+			if not Root.Variables[Local] then
+				Root.Variables[Local] = true
+				Root:_lineFront(`local {Local} = {ReadTable}`)
+			end
+			ReadTable = Local
+		end
+
+		if IsFieldAccess(Variable) then
+			--> Checked in a local, so the field is written once and not read back
+			Read:Line(`{Read:Declare("EnumValue")} = {ReadTable}[Index + 1]`)
+			Read:Compare("EnumValue", "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+			Read:Line(`{Variable} = EnumValue :: any`)
+		else
+			Read:Line(`{Read:Declare(Variable)} = {ReadTable}[Index + 1] :: any`)
+			Read:Compare(Variable, "nil", "Equals"):Line(`error(\`Unexpected enum: \{Index\}\`)`):End()
+		end
 
 		Write:Line(`{Write:Declare("EnumIndex")} = {WriteTable}[{Variable}]`)
 		Write:Compare("EnumIndex", "nil", "Equals")
@@ -353,8 +503,10 @@ function Declarations.Enum(Declaration: Parser.Enum, Read: Blocks.Block, Write: 
 		return
 	end
 
-	--> Read body
-	Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	--> Read body (a field needs no placeholder: every branch assigns it or errors)
+	if not IsFieldAccess(Variable) then
+		Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	end
 	Types.u8.Read(`Index`, Read)
 	Read = Read:Compare("Index", "0", "Equals")
 	for Index, EnumItem in Enums do
@@ -380,7 +532,13 @@ function Declarations.Enum(Declaration: Parser.Enum, Read: Blocks.Block, Write: 
 	Write:Branch("Default"):Line(`error(\`Unexpected enum: \{{Variable}\}, expected one of {Literal}.\`)`):End()
 end
 
-function Declarations.Map(Declaration: Parser.Map, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Map(
+	Declaration: Parser.Map,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?
+)
 	local MapValue = Declaration.Value
 	local Key = MapValue.Values[1]
 	local Value = MapValue.Values[2]
@@ -390,7 +548,25 @@ function Declarations.Map(Declaration: Parser.Map, Read: Blocks.Block, Write: Bl
 	local ElementsVariable = `Elements_{Write.Indent}`
 	local ElementsAllocation = Write:Allocate(2)
 
-	Read:Line(`{Read:Declare(Variable)} = \{\}`)
+	local MapVariable = Variable
+	local ElementSource: Source? = nil
+	if Source then
+		--> Reuse mode: the previous map, emptied; its values' tables become spares for the new ones
+		if IsFieldAccess(Variable) then
+			MapVariable = `Map_{Read.Indent}`
+		end
+		ReuseTable(Read, MapVariable, Source, "{}")
+		if UsesSpares(Value :: Type) then
+			local Spare = NewSpareList()
+			Read:Line(`for _, Old in {MapVariable} do`)
+			Read:Line(`table.insert({Spare}, Old)`, Read.Indent + 1)
+			Read:Line("end")
+			ElementSource = { Get = `table.remove({Spare}) :: any` }
+		end
+		Read:Line(`table.clear({MapVariable})`)
+	else
+		Read:Line(`{Read:Declare(Variable)} = \{\}`)
+	end
 	Write:Line(`local {ElementsVariable} = 0`)
 	Types.u16.Read(ElementsVariable, Read)
 
@@ -404,8 +580,8 @@ function Declarations.Map(Declaration: Parser.Map, Read: Blocks.Block, Write: Bl
 	--ReadLoop:Line(`local Key: {KeyType}, Element: {ValueType};`)
 	WriteLoop:Line(`{ElementsVariable} += 1`)
 	Generators.UserType(Key :: Type, ReadLoop, WriteLoop, KeyVariable)
-	Generators.UserType(Value :: Type, ReadLoop, WriteLoop, ElementVariable)
-	ReadLoop:Line(`{Variable}[{KeyVariable}] = {ElementVariable}`)
+	Generators.UserType(Value :: Type, ReadLoop, WriteLoop, ElementVariable, ElementSource)
+	ReadLoop:Line(`{MapVariable}[{KeyVariable}] = {ElementVariable}`)
 
 	WriteLoop:End()
 	ReadLoop:End()
@@ -413,32 +589,85 @@ function Declarations.Map(Declaration: Parser.Map, Read: Blocks.Block, Write: Bl
 	Write:Line(`buffer.writeu16(SendBuffer, {ElementsAllocation}, {ElementsVariable})`)
 end
 
-function Declarations.Struct(Declaration: Parser.Struct, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Struct(
+	Declaration: Parser.Struct,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?,
+	Guard: string?,
+	TagKey: string?
+)
 	local Value = Declaration.Value
 
+	--> A struct of plain fields is read into locals and built by one constructor holding the
+	--> values (no placeholder writes). The reads are generated apart from the writes, which use
+	--> the struct's fields.
+	if Source == nil and TagKey == nil and IsFlatStruct(Declaration) then
+		Read:Declare(Variable, true)
+		local Scope = Read:Scope()
+		local Entries = {}
+		for Index, Field in Value.Values do
+			local Name = Field.Name
+			local Local = if IsValidIdentifier(Name) then `Field_{Name}` else `Field_{Index}`
+			Generators.UserType(Field :: Type, Scope, Blocks.Block(), Local)
+			table.insert(Entries, `{FormatKey(Name)} = {Local}`)
+		end
+		Scope:Line(`{Variable} = \{{table.concat(Entries, ", ")}\} :: any`)
+		Scope:End()
+
+		for _, Field in Value.Values do
+			Generators.UserType(Field :: Type, Blocks.Block(), Write, `{Variable}{FormatIndex(Field.Name)}`)
+		end
+		return
+	end
+
 	--> Constant-valued constructor compiles to DUPTABLE: one allocation, keys pre-sized.
-	--> Every placeholder is overwritten by the field reads below.
+	--> Every placeholder is overwritten by the field reads below (a tagged enum variant's
+	--> tag field by the enum).
 	local Template = {}
 	for _, Field in Value.Values do
 		table.insert(Template, `{FormatKey(Field.Name)} = false`)
 	end
-	Read:Line(`{Read:Declare(Variable)} = \{{table.concat(Template, ", ")}\} :: any`)
+	if TagKey then
+		table.insert(Template, `{FormatKey(TagKey)} = false`)
+	end
+	local Constructor = `\{{table.concat(Template, ", ")}\} :: any`
+	if Source then
+		ReuseTable(Read, Variable, Source, Constructor, Guard)
+	else
+		Read:Line(`{Read:Declare(Variable)} = {Constructor}`)
+	end
 
 	for _, Field in Value.Values do
 		local Name = Field.Name
 		local FieldVariable = `{Variable}{FormatIndex(Name)}`
-		Generators.UserType(Field :: Type, Read, Write, FieldVariable)
+		--> Reuse mode: nested tables are decoded into the previous value's field in place
+		local FieldSource = if Source and IsTableType(Field :: Type) then InPlace(FieldVariable) else nil
+		Generators.UserType(Field :: Type, Read, Write, FieldVariable, FieldSource)
 	end
 end
 
-function Declarations.Tuple(Declaration: Parser.Tuple, Read: Blocks.Block, Write: Blocks.Block)
+function Declarations.Tuple(Declaration: Parser.Tuple, Read: Blocks.Block, Write: Blocks.Block, Slots: { string }?)
 	for Index, Value in Declaration.Value.Values do
 		local Variable = `Value{Index}`
-		Generators.UserType(Value :: Type, Read, Write, Variable)
+		local Source: Source? = nil
+		if Slots and IsTableType(Value :: Type) then
+			local Slot = NewRootSlot()
+			Source = { Get = Slot, Set = Slot }
+			table.insert(Slots, Slot)
+		end
+		Generators.UserType(Value :: Type, Read, Write, Variable, Source)
 	end
 end
 
-function Declarations.TagEnum(Declaration: Parser.TagEnum, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.TagEnum(
+	Declaration: Parser.TagEnum,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?
+)
 	local Value = Declaration.Value
 	local Values = Value.Values
 
@@ -448,7 +677,12 @@ function Declarations.TagEnum(Declaration: Parser.TagEnum, Read: Blocks.Block, W
 	local TagIndex = `{Variable}{FormatIndex(Tag)}`
 
 	Types.u8.Read(`Tag`, Read)
-	Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	if Source then
+		--> Reuse mode: no placeholder, the variant's struct takes the previous table or a new one
+		Read:Declare(Variable, true)
+	else
+		Read:Line(`{Read:Declare(Variable)} = true :: any`)
+	end
 
 	local Allocation = Write:Allocate(1)
 
@@ -465,7 +699,8 @@ function Declarations.TagEnum(Declaration: Parser.TagEnum, Read: Blocks.Block, W
 		Write:_lineFront(`buffer.writeu8(SendBuffer, {Allocation}, {Index - 1})`)
 		Write:Advance(1)
 
-		Generators.UserType(Variant, Read, Write, Variable)
+		--> Reuse mode: the previous table only serves a value of the same variant
+		Declarations.Struct(Variant, Read, Write, Variable, Source, if Source then `{TagIndex} ~= {Name}` else nil, Tag)
 		Read:Line(`{TagIndex} = {Name}`)
 	end
 
@@ -495,10 +730,17 @@ function Declarations.Event(Declaration: Parser.Event)
 	local Index = Channel.Count
 	local Queue = `Queue.{Reliability}[{Index}]`
 	local Connection = `Events.{Reliability}[{Index}]`
+	--> The receive handlers find their listeners through a local alias of Events.<Channel>
+	local ListenersLocal = `Events{Reliability}[{Index}]`
+
+	--> ReuseReceiveTables / ReuseTables: listened (not polled) events may decode into the
+	--> previous value's tables. ReuseSlots collects the slots holding this event's root tables.
+	local Reuse = if Value.ReuseTables ~= nil then Value.ReuseTables else Options.ReuseReceiveTables == true
+	local ReuseSlots: { string }? = if Reuse and CanListen and not IsPolling then {} else nil
 
 	--> Data body
 	local Types, Values, Arguments, _ = "nil", "Value: nil", "Value", nil
-	local Read, Write = Generators.Event(Value.Data, Index, Identifier)
+	local Read, Write = Generators.Event(Value.Data, Index, Identifier, nil, ReuseSlots)
 
 	if Value.Data then
 		Types, Values, _, Arguments = Generators.LuauType(Value.Data :: Type, true)
@@ -547,6 +789,16 @@ function Declarations.Event(Declaration: Parser.Event)
 		local ContextArguments = `Listener: ({Context == "Server" and "Player: Player, " or ""}{Values}) -> ()`
 		local ListenerArguments = `{PlayerArgument}{Arguments}`
 
+		--> Reused tables must not be overwritten while something still holds them: a value that is
+		--> queued (no listener yet) or held by an Async listener that yielded (its thread was not
+		--> handed back, so FreeThread is nil) keeps its tables, the next event allocates new ones.
+		local ReleaseTables: { string } = {}
+		if ReuseSlots then
+			for _, Slot in ReuseSlots do
+				table.insert(ReleaseTables, `{Slot} = nil\n`)
+			end
+		end
+
 		--> Listener invocation
 		local CallListener = Blocks.Block()
 		do
@@ -557,6 +809,11 @@ function Declarations.Event(Declaration: Parser.Event)
 			local PathExpr = "Listener"
 			local CallExpr = IsSync and `{PathExpr}({ListenerArguments})` or `Spawn({PathExpr}, {ListenerArguments})`
 			CallListener = CallListener:Line(CallExpr)
+			if not IsSync and #ReleaseTables > 0 then
+				CallListener = CallListener:Line("if FreeThread == nil then")
+				CallListener:Lines(ReleaseTables, CallListener.Indent + 1)
+				CallListener:Line("end")
+			end
 		end
 
 		--> Receive handler, dispatched by event index
@@ -572,7 +829,7 @@ function Declarations.Event(Declaration: Parser.Event)
 		end
 
 		if IsSingle then
-			Handler:Line(`local Listener = {Connection}`)
+			Handler:Line(`local Listener = {ListenersLocal}`)
 		end
 
 		if IsReliable then
@@ -580,21 +837,22 @@ function Declarations.Event(Declaration: Parser.Event)
 			if IsSingle then
 				ListenerBound = Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1)
 			else
-				Handler:Line(`local Listeners = {Connection}`)
+				Handler:Line(`local Listeners = {ListenersLocal}`)
 				ListenerBound = Handler:Compare(`#Listeners`, "0", "Greater")
 					:Iterator("_", "Listener", "Listeners")
 					:Lines(CallListener.Content, Handler.Indent + 2)
 					:End()
 			end
 
-			ListenerBound:Branch("Default")
-				:Line(`QueueEvent({Queue}, "{Name}", {ListenerArguments})`)
-				:End()
+			local Default = ListenerBound:Branch("Default")
+			Default:Line(`QueueEvent({Queue}, "{Name}", {ListenerArguments})`)
+			Default:Lines(ReleaseTables, Default.Indent)
+			Default:End()
 		else
 			if IsSingle then
 				Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1):End()
 			else
-				Handler:Iterator("_", "Listener", Connection):Lines(CallListener.Content, Handler.Indent + 1):End()
+				Handler:Iterator("_", "Listener", ListenersLocal):Lines(CallListener.Content, Handler.Indent + 1):End()
 			end
 		end
 
@@ -905,7 +1163,13 @@ function Declarations.Function(Declaration: Parser.Function)
 	Return.PushLines(Body.DumpLines(), 0)
 end
 
-function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Array(
+	Declaration: Parser.Array,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?
+)
 	local Value = Declaration.Value
 	local Of = Value.Of
 	local Range = Value.Range :: NumberRange
@@ -925,15 +1189,52 @@ function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write
 		LengthType.Read("Length", Read)
 		local Assert = Prefabs.Asserts.integer("Length", Lower, Upper)
 
-		Read:Line(Assert.Lower)
+		--> The length is read unsigned: a lower bound of 0 needs no check
+		if Lower > 0 then
+			Read:Line(Assert.Lower)
+		end
 		Read:Line(Assert.Upper)
 		LengthType.Write(`#{Variable}`, Write)
 	else
 		Read:Line(`local Length = {Upper}`)
 	end
 
-	--> Array
-	Read:Line(`{Read:Declare(Variable)} = table.create(Length)`)
+	--> Array: a struct field is aliased by a local so the item stores do not index the struct again
+	local ArrayVariable = Variable
+	if IsFieldAccess(Variable) then
+		ArrayVariable = `Array_{Read.Indent}`
+	end
+
+	local ItemSource: Source? = nil
+	if Source then
+		--> Reuse mode: the previous array, its items' tables decoded in place. A cut tail's tables
+		--> become spares. Items that can be nil may leave holes, so such arrays are emptied instead.
+		local ReadCounter = `Index_{Read.Indent}`
+		ReuseTable(Read, ArrayVariable, Source, "table.create(Length)")
+		if CanBeNil(Of) then
+			Read:Line(`table.clear({ArrayVariable})`)
+		elseif IsVariableSize then
+			local Spare = if UsesSpares(Of) then NewSpareList() else nil
+			Read:Line(`for {ReadCounter} = #{ArrayVariable}, Length + 1, -1 do`)
+			if Spare then
+				Read:Line(`table.insert({Spare}, {ArrayVariable}[{ReadCounter}])`, Read.Indent + 1)
+			end
+			Read:Line(`{ArrayVariable}[{ReadCounter}] = nil`, Read.Indent + 1)
+			Read:Line("end")
+			if IsTableType(Of) then
+				local Item = `{ArrayVariable}[{ReadCounter}]`
+				ItemSource = { Get = Item, Set = Item, Spare = Spare }
+			end
+		elseif IsTableType(Of) then
+			local Item = `{ArrayVariable}[{ReadCounter}]`
+			ItemSource = { Get = Item, Set = Item }
+		end
+	elseif ArrayVariable ~= Variable then
+		Read:Line(`{Read:Declare(ArrayVariable)} = table.create(Length)`)
+		Read:Line(`{Variable} = {ArrayVariable}`)
+	else
+		Read:Line(`{Read:Declare(Variable)} = table.create(Length)`)
+	end
 
 	--> Body
 	local ReadCounter = `Index_{Read.Indent}`
@@ -942,9 +1243,12 @@ function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write
 	Write = Write:Loop(`{WriteCounter} = 1`, IsVariableSize and `#{Variable}` or Upper)
 
 	Write:Line(`local {Iterator} = {Variable}[{WriteCounter}]`)
-	Generators.UserType(Of, Read, Write, Iterator)
+	Generators.UserType(Of, Read, Write, Iterator, ItemSource)
 
-	Read:Line(`{Variable}[{ReadCounter}] = {Iterator}`)
+	--> A recycled item table is already in place
+	if ItemSource == nil then
+		Read:Line(`{ArrayVariable}[{ReadCounter}] = {Iterator}`)
+	end
 
 	--> End
 	Read = Read:End()
@@ -954,11 +1258,44 @@ function Declarations.Array(Declaration: Parser.Array, Read: Blocks.Block, Write
 	Write:Comment("END ARRAY")
 end
 
-function Declarations.Optional(Declaration: Parser.Optional, Read: Blocks.Block, Write: Blocks.Block, Variable: string)
+function Declarations.Optional(
+	Declaration: Parser.Optional,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string,
+	Source: Source?
+)
 	Read:Declare(Variable, true)
 
 	local Of = Declaration.Value.Of
 	local IsInstance = if Of.Type == "Primitive" then Of.Tokens.Primitive.Value == "Instance" else false
+
+	if Source and not IsInstance then
+		--> Reuse mode: a present value is decoded into the previous table, an absent one clears
+		--> the field (a struct field keeps no table while it is nil)
+		Types.u8.Write(`{Variable} ~= nil and 1 or 0`, Write)
+		Read = Read:Compare(`buffer.readu8(RecieveBuffer, {Read:Read(1)})`, "1", "Equals")
+		Write = Write:Compare(Variable, "nil", "Not")
+		if IsFieldAccess(Variable) and UsesSpares(Of) then
+			--> A struct field: its table becomes a spare while the field is nil
+			local Spare = NewSpareList()
+			Generators.UserType(Of, Read, Write, Variable, { Get = Variable, Set = Variable, Spare = Spare })
+			Read = Read:Branch("Default")
+			Read:Line(`if {Variable} then`)
+			Read:Line(`table.insert({Spare}, {Variable})`, Read.Indent + 1)
+			Read:Line("end")
+			Read:Line(`{Variable} = nil`)
+		else
+			Generators.UserType(Of, Read, Write, Variable, Source)
+			if IsFieldAccess(Variable) then
+				Read = Read:Branch("Default")
+				Read:Line(`{Variable} = nil`)
+			end
+		end
+		Read:End()
+		Write:End()
+		return
+	end
 
 	if IsInstance then
 		if string.find(Variable, "[%.%[]") then
@@ -985,7 +1322,16 @@ function Declarations.Optional(Declaration: Parser.Optional, Read: Blocks.Block,
 end
 
 --> Generator functions
-function Generators.UserType(Declaration: Type, Read: Blocks.Block, Write: Blocks.Block, Variable: string?)
+--> Source (reuse mode only, table types only): where the previous value's table for this
+--> value is found, see ReuseTable. Guard: an extra condition under which it is not reused.
+function Generators.UserType(
+	Declaration: Type,
+	Read: Blocks.Block,
+	Write: Blocks.Block,
+	Variable: string?,
+	Source: Source?,
+	Guard: string?
+)
 	local Name = Declaration.Name
 	local Variable = Variable or "Value"
 
@@ -1002,21 +1348,21 @@ function Generators.UserType(Declaration: Type, Read: Blocks.Block, Write: Block
 
 		Declarations.Primitive(Declaration, Read, Write, Variable)
 	elseif Declaration.Type == "Set" then
-		Declarations.Set(Declaration, Read, Write, Variable)
+		Declarations.Set(Declaration, Read, Write, Variable, Source)
 	elseif Declaration.Type == "Map" then
-		Declarations.Map(Declaration, Read, Write, Variable)
+		Declarations.Map(Declaration, Read, Write, Variable, Source)
 	elseif Declaration.Type == "Enum" then
 		Declarations.Enum(Declaration, Read, Write, Variable)
 	elseif Declaration.Type == "Struct" then
-		Declarations.Struct(Declaration, Read, Write, Variable)
+		Declarations.Struct(Declaration, Read, Write, Variable, Source, Guard)
 	elseif Declaration.Type == "Tuple" then
 		Declarations.Tuple(Declaration, Read, Write)
 	elseif Declaration.Type == "TagEnum" then
-		Declarations.TagEnum(Declaration, Read, Write, Variable)
+		Declarations.TagEnum(Declaration, Read, Write, Variable, Source)
 	elseif Declaration.Type == "Array" then
-		Declarations.Array(Declaration, Read, Write, Variable)
+		Declarations.Array(Declaration, Read, Write, Variable, Source)
 	elseif Declaration.Type == "Optional" then
-		Declarations.Optional(Declaration, Read, Write, Variable)
+		Declarations.Optional(Declaration, Read, Write, Variable, Source)
 	end
 end
 
@@ -1218,11 +1564,14 @@ function Generators.Export(Declaration: Type)
 	Return.PushLines(BodyLines, 0, 0)
 end
 
+--> ReuseSlots (events only): when given, the read reuses the previous value's tables and the
+--> ReusedTables slots holding the root tables are appended to it.
 function Generators.Event(
 	Data: Type?,
 	Index: number,
 	Identifier: string,
-	Function: ("Data" | "Return")?
+	Function: ("Data" | "Return")?,
+	ReuseSlots: { string }?
 ): ({ string }, { string })
 	local Type, Values, _, Returns = "nil", "Value: nil", nil, "nil"
 	if Data then
@@ -1248,7 +1597,15 @@ function Generators.Event(
 	end
 
 	if Data then
-		Generators.UserType(Data, Read, Write)
+		if ReuseSlots and Data.Type == "Tuple" then
+			Declarations.Tuple(Data :: Parser.Tuple, Read, Write, ReuseSlots)
+		elseif ReuseSlots and IsTableType(Data) then
+			local Slot = NewRootSlot()
+			table.insert(ReuseSlots, Slot)
+			Generators.UserType(Data, Read, Write, nil, { Get = Slot, Set = Slot })
+		else
+			Generators.UserType(Data, Read, Write)
+		end
 	end
 
 	return Read:Return(Returns):End().Content, Write:End().Content
@@ -1417,6 +1774,8 @@ function Generator.Reset()
 	SendsReliable = false
 	IndexType = "u8"
 	IndexBytes = 1
+	ReuseSlotCount = 0
+	ReuseSpares = {}
 
 	--> Reset channels
 	Channels.Reliable.Count = 0
@@ -1549,6 +1908,9 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		{ `local REUSE_SEND_BUFFERS = {Options.ReuseSendBuffers == true}\n` },
 		string.split(Sources.Base, "\r"),
 		(if Options.SyncValidation then SYNC_VALIDATION_BODY else {}),
+		(if ReuseSlotCount > 0 then { `local {REUSED_TABLES}: \{[number]: any\} = \{\}\n` } else {}),
+		ReuseSpares,
+		{ "local EventsReliable, EventsUnreliable = Events.Reliable, Events.Unreliable\n" },
 		Events.DumpLines(),
 		LuauTypes.DumpLines(),
 		{ "local EnumTables: {[number]: any} = {}\n", ENUM_TABLES_MARKER },

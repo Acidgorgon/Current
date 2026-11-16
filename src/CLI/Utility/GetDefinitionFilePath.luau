@@ -10,6 +10,11 @@ local fs = require("@lune/fs")
 local EXTENSIONS = { "", ".txt", ".blink", ".current" }
 
 return function(Path: string): string
+	-- A path that names an existing file wins: `current events.current` must never pick a sibling events.blink.
+	if fs.isFile(Path) then
+		return Path
+	end
+
 	local Directory, Filename = PathParser.Components(Path)
 	Directory = Directory or "./"
 	assert(Filename, `Unable to parse filename from {Path}, path may be malformed!`)

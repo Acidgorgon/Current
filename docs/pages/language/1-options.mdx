@@ -100,8 +100,8 @@ When the table stays valid:
 * Values that arrive before a listener is connected are queued with their own tables.
 * `Polling` events never reuse tables: their values wait in a queue.
 * Every listener of a `Many` event receives the same table, as without this option.
-* On the server one table serves the event for every player: a value from one player is overwritten by the next
-  player's.
+* On the server each player has their own tables: a value is only overwritten by the same player's next value of
+  the event, not by another player's.
 
 How values are updated:
 * Arrays keep their table: items are overwritten, and a shorter array has its tail removed.

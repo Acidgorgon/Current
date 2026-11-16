@@ -123,6 +123,16 @@ local function NewSpareList(): string
 	return Slot
 end
 
+--> Where an event keeps the root table of a value. The server keeps one per player (weak keys,
+--> so leaving players are collected): a value is only overwritten by the same player's next one.
+local function NewRootSlot(): string
+	local Slot = NewReuseSlot()
+	if Context == "Server" then
+		table.insert(ReuseSpares, `{Slot} = setmetatable(\{\}, \{ __mode = "k" \})\n`)
+		return `{Slot}[Player]`
+	end
+	return Slot
+end
 
 --> Fire method factories, emitted only when used. Each takes an event's serializer and
 --> returns the method, so every event shares these few prototypes. The "1" variants
@@ -643,7 +653,7 @@ function Declarations.Tuple(Declaration: Parser.Tuple, Read: Blocks.Block, Write
 		local Variable = `Value{Index}`
 		local Source: Source? = nil
 		if Slots and IsTableType(Value :: Type) then
-			local Slot = NewReuseSlot()
+			local Slot = NewRootSlot()
 			Source = { Get = Slot, Set = Slot }
 			table.insert(Slots, Slot)
 		end
@@ -1585,7 +1595,7 @@ function Generators.Event(
 		if ReuseSlots and Data.Type == "Tuple" then
 			Declarations.Tuple(Data :: Parser.Tuple, Read, Write, ReuseSlots)
 		elseif ReuseSlots and IsTableType(Data) then
-			local Slot = NewReuseSlot()
+			local Slot = NewRootSlot()
 			table.insert(ReuseSlots, Slot)
 			Generators.UserType(Data, Read, Write, nil, { Get = Slot, Set = Slot })
 		else

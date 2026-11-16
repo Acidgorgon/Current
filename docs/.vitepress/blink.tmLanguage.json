@@ -181,7 +181,7 @@
 		"setting": {
 			"patterns": [
 				{
-					"match": "\\b(?:Server|Client|Reliable|Unreliable|SingleSync|SingleAsync|ManySync|ManyAsync|Polling|Coroutine|Future|Promise|Pascal|Camel|Snake)\\b",
+					"match": "\\b(?:Server|Client|Both|Reliable|Unreliable|SingleSync|SingleAsync|ManySync|ManyAsync|Polling|Coroutine|Future|Promise|Pascal|Camel|Snake)\\b",
 					"name": "entity.name.type.enum.blink"
 				}
 			]

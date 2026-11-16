@@ -1329,9 +1329,12 @@ local function Shake(Source: string): string
 			continue
 		end
 
-		local Last = Body + 1
-		while Last <= #Lines and Lines[Last] ~= "end" do
+		local Last = Body
+		if not string.find(Lines[Body], "%f[%w_]end%s*$") then
 			Last += 1
+			while Last <= #Lines and Lines[Last] ~= "end" do
+				Last += 1
+			end
 		end
 
 		local First = Index

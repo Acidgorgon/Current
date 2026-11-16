@@ -23,6 +23,48 @@ if not Unreliable then
     Unreliable = UnreliableRemoteEvent
 end
 
+--> Unreliable sends: the event was serialized into Scratch
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliable
+SendUnreliable = function(Player: Player)
+    Save(Scratch)
+    Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
+    EndScratch()
+end
+
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableAll
+SendUnreliableAll = function()
+    Save(Scratch)
+    Unreliable:FireAllClients(Pack(Scratch), SendInstances)
+    EndScratch()
+end
+
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableList
+SendUnreliableList = function(List: {Player})
+    Save(Scratch)
+    local Buffer = Pack(Scratch)
+    for _, Player in List do
+        Unreliable:FireClient(Player, Buffer, SendInstances)
+    end
+    EndScratch()
+end
+
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableExcept
+SendUnreliableExcept = function(Except: Player)
+    Save(Scratch)
+    local Buffer = Pack(Scratch)
+    for _, Player in Players:GetPlayers() do
+        if Player ~= Except then
+            Unreliable:FireClient(Player, Buffer, SendInstances)
+        end
+    end
+    EndScratch()
+end
+
+-- RELIABLE --
 --> Reliable traffic. FireAll only appends to the broadcast log (the Home writer),
 --> so its cost does not grow with the player count. A player's own writer only
 --> holds private events, plus the slice of the broadcast log that came before
@@ -143,47 +185,6 @@ SendReliableList = function(List: {Player})
     table.clear(Instances)
 end
 
---> Unreliable sends: the event was serialized into Scratch
---> Declared then assigned so the compiler does not inline it into every event (native code size)
-local SendUnreliable
-SendUnreliable = function(Player: Player)
-    Save(Scratch)
-    Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
-    EndScratch()
-end
-
---> Declared then assigned so the compiler does not inline it into every event (native code size)
-local SendUnreliableAll
-SendUnreliableAll = function()
-    Save(Scratch)
-    Unreliable:FireAllClients(Pack(Scratch), SendInstances)
-    EndScratch()
-end
-
---> Declared then assigned so the compiler does not inline it into every event (native code size)
-local SendUnreliableList
-SendUnreliableList = function(List: {Player})
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
-    for _, Player in List do
-        Unreliable:FireClient(Player, Buffer, SendInstances)
-    end
-    EndScratch()
-end
-
---> Declared then assigned so the compiler does not inline it into every event (native code size)
-local SendUnreliableExcept
-SendUnreliableExcept = function(Except: Player)
-    Save(Scratch)
-    local Buffer = Pack(Scratch)
-    for _, Player in Players:GetPlayers() do
-        if Player ~= Except then
-            Unreliable:FireClient(Player, Buffer, SendInstances)
-        end
-    end
-    EndScratch()
-end
-
 --> In a function: a loop in the module's main chunk would make it compile natively
 local function AddExistingPlayers()
     for _, Player in Players:GetPlayers() do
@@ -255,4 +256,5 @@ local function StepReplication()
     table.clear(BroadcastInstances)
     Load(Home)
 end
+-- RELIABLE --
 ]]

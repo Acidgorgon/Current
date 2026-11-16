@@ -193,6 +193,11 @@ end
 }
 local UsedFactories: { [string]: boolean } = {}
 
+--> Whether this module sends anything reliable to players (server only). Without such
+--> sends the server keeps no per-player writers and StepReplication has nothing to do.
+local SendsReliable = false
+local RELIABLE_MARKER = "-- RELIABLE --\n"
+
 local Channels: { [string]: { Count: number, Listening: boolean } } = {
 	Reliable = { Count = 0, Listening = false },
 	Unreliable = { Count = 0, Listening = false },
@@ -658,6 +663,7 @@ function Declarations.Event(Declaration: Parser.Event)
 		local ExceptValues = `Except: Player, {Values}`
 
 		if IsReliable then
+			SendsReliable = true
 			FireFunction(Casing.Fire, PlayerValues, IsSingleValue and "ReliableFire1" or "ReliableFire")
 			FireFunction(Casing.FireAll, Values, IsSingleValue and "ReliableFireAll1" or "ReliableFireAll")
 			FireFunction(Casing.FireList, ListValues, "ReliableFireList")
@@ -703,6 +709,10 @@ function Declarations.Function(Declaration: Parser.Function)
 	end
 
 	local Channel = Channels.Reliable
+	if Context == "Server" then
+		--> Return values go back through the player's reliable writer
+		SendsReliable = true
+	end
 
 	local Index = Channel.Count
 	local Queue = `Queue.Reliable[{Index}]`
@@ -1291,6 +1301,90 @@ local function CountChannels(Tree: { Parser.Declaration }, Counts: { number }?):
 	return Counts[1], Counts[2]
 end
 
+--> Drops top-level local functions of the runtime templates that nothing else in the
+--> module refers to (queue helpers without polling, listener threads without Async
+--> listeners, unused send paths, ...), so a module only carries the code it can run.
+--> A name that appears anywhere else, even in a comment or string, keeps its function.
+local function Shake(Source: string): string
+	local Lines = string.split(Source, "\n")
+	local Chunks: { { Name: string, First: number, Last: number } } = {}
+
+	local Index = 1
+	while Index <= #Lines do
+		local Line = Lines[Index]
+		local Name = string.match(Line, "^local function ([%a_][%w_]*)%(")
+		local Body = Index
+		if Name == nil then
+			local Declared = string.match(Line, "^local ([%a_][%w_]*)$")
+			local Next = Lines[Index + 1]
+			if Declared and Next and string.sub(Next, 1, #Declared + 12) == `{Declared} = function(` then
+				Name = Declared
+				Body = Index + 1
+			end
+		end
+
+		if Name == nil then
+			Index += 1
+			continue
+		end
+
+		local Last = Body + 1
+		while Last <= #Lines and Lines[Last] ~= "end" do
+			Last += 1
+		end
+
+		local First = Index
+		while First > 1 and string.sub(Lines[First - 1], 1, 3) == "-->" do
+			First -= 1
+		end
+
+		table.insert(Chunks, { Name = Name, First = First, Last = Last })
+		Index = Last + 1
+	end
+
+	local function Count(Text: string, Name: string): number
+		local Total = 0
+		for _ in string.gmatch(Text, `%f[%w_]{Name}%f[^%w_]`) do
+			Total += 1
+		end
+		return Total
+	end
+
+	local Dead: { [number]: boolean } = {}
+	local Changed = true
+	while Changed do
+		Changed = false
+		local Live = {}
+		for Position, Line in Lines do
+			if not Dead[Position] then
+				table.insert(Live, Line)
+			end
+		end
+		local Text = table.concat(Live, "\n")
+
+		for _, Chunk in Chunks do
+			if Dead[Chunk.First] then
+				continue
+			end
+			local Own = Count(table.concat(Lines, "\n", Chunk.First, Chunk.Last), Chunk.Name)
+			if Count(Text, Chunk.Name) == Own then
+				for Position = Chunk.First, Chunk.Last do
+					Dead[Position] = true
+				end
+				Changed = true
+			end
+		end
+	end
+
+	local Kept = {}
+	for Position, Line in Lines do
+		if not Dead[Position] then
+			table.insert(Kept, Line)
+		end
+	end
+	return table.concat(Kept, "\n")
+end
+
 local Generator = {}
 
 function Generator.Reset()
@@ -1305,6 +1399,7 @@ function Generator.Reset()
 	EnumTables = {}
 	EnumTableCount = 0
 	UsedFactories = {}
+	SendsReliable = false
 	IndexType = "u8"
 	IndexBytes = 1
 
@@ -1357,6 +1452,11 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 
 	--> Generate context source
 	local Source = Sources[Context]
+	local Runtime = Source[2]
+	local Sections = string.split(Runtime, RELIABLE_MARKER)
+	if #Sections == 3 then
+		Runtime = Sections[1] .. (if SendsReliable then Sections[2] else "local function StepReplication() end\n") .. Sections[3]
+	end
 
 	--> Receive connections: read the event index, then jump straight to its handler
 	local Connections = {}
@@ -1429,7 +1529,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		Constants.DumpLines(),
 		UserTypes.DumpLines(),
 		Noop.DumpLines(),
-		string.split(Source[2], "\r"),
+		string.split(Runtime, "\r"),
 		Replication.DumpLines(),
 		HandlerLines.DumpLines(),
 		Connections,
@@ -1438,7 +1538,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		{ `type {EVENTS_TYPE} = typeof(Returns)\n`, `return Returns :: {EVENTS_TYPE}` }
 	)
 
-	return table.concat(MergedOutput)
+	return Shake(table.concat(MergedOutput))
 end
 
 function Generator.GenerateShared(AbstractSyntaxTree: Parser.Body): string

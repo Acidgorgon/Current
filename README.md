@@ -7,6 +7,19 @@
 
 An IDL compiler written in Luau for ROBLOX buffer networking
 
+blink-plus is a fork of [Blink](https://github.com/1Axen/blink) by 1Axen.
+
+# Install
+With [rokit](https://github.com/rojo-rbx/rokit), add this line under `[tools]` in your `rokit.toml` (or run `rokit add Acidgorgon/blink-plus blink`):
+
+```toml
+blink = "Acidgorgon/blink-plus@0.19.0"
+```
+
+Or download the archive for your platform from the [Releases](https://github.com/Acidgorgon/blink-plus/releases) page, extract it and put the `blink` executable on your `PATH`. The Studio plugin is attached to each release as `blink-plugin.rbxm`.
+
+blink-plus is a drop-in replacement for the `blink` CLI: the executable has the same name, it takes the same arguments and the same schema language, and it adds `From: Both` events. Run it the same way, e.g. `blink events.blink`.
+
 # Performance
 Blink aims to generate the most performant and bandwidth-efficient code for your specific experience, but what does this mean?  
 

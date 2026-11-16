@@ -320,6 +320,7 @@ local GENERICS_TYPES = {
 
 local RESERVED = {
 	StepReplication = true,
+	SetInvalidPacketHandler = true,
 }
 
 local PRIMITIVES = Settings.Primtives

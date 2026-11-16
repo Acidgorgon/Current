@@ -241,6 +241,20 @@ end
 }
 local UsedFactories: { [string]: boolean } = {}
 
+--> Server: the next free per-player bucket for an event's Rate (see Allow in Templates/Server)
+local RATE_SLOT_START = 7
+local NextRateSlot = RATE_SLOT_START
+
+--> The server-side check of an event's or function's Rate, or nil when it has none
+local function RateCheck(Rate: number?, Name: string): string?
+	if Rate == nil or Context ~= "Server" then
+		return nil
+	end
+	local Slot = NextRateSlot
+	NextRateSlot += 2
+	return `Allow(Player, {Slot}, {Rate}, {math.max(Rate, 1)}, "{Name}")`
+end
+
 --> Whether this module sends anything reliable to players (server only). Without such
 --> sends the server keeps no per-player writers and StepReplication has nothing to do.
 local SendsReliable = false
@@ -867,6 +881,11 @@ function Declarations.Event(Declaration: Parser.Event)
 			end
 		end
 
+		--> Server: a Sync listener runs inside the packet's xpcall. The flag tells its errors apart
+		--> from decode errors, so a listener bug is reported as an error and the packet goes on.
+		local GuardListener = IsSync and Context == "Server"
+		local Rate = RateCheck(Value.Rate, Name)
+
 		--> Receive handler, dispatched by event index
 		local Handler = Blocks.Function(`{HandlersTable}[{Index}]`, PlayerParameter, nil, true)
 		if Value.Data then
@@ -879,20 +898,41 @@ function Declarations.Event(Declaration: Parser.Event)
 			Handler:Line("local Value = nil")
 		end
 
+		if Rate then
+			Handler:Line(`if not {Rate} then return end`)
+		end
+
 		if IsSingle then
 			Handler:Line(`local Listener = {ListenersLocal}`)
 		end
 
+		local Before = GuardListener and "ListenerRunning = true" or nil
+		local After = GuardListener and "ListenerRunning = false" or nil
+
 		if IsReliable then
 			local ListenerBound: Blocks.Block
 			if IsSingle then
-				ListenerBound = Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1)
+				ListenerBound = Handler:Compare("Listener", "nil", "Not")
+				if Before then
+					ListenerBound:Line(Before)
+				end
+				ListenerBound:Lines(CallListener.Content, Handler.Indent + 1)
+				if After then
+					ListenerBound:Line(After)
+				end
 			else
 				Handler:Line(`local Listeners = {ListenersLocal}`)
 				ListenerBound = Handler:Compare(`#Listeners`, "0", "Greater")
+				if Before then
+					ListenerBound:Line(Before)
+				end
+				ListenerBound = ListenerBound
 					:Iterator("_", "Listener", "Listeners")
 					:Lines(CallListener.Content, Handler.Indent + 2)
 					:End()
+				if After then
+					ListenerBound:Line(After)
+				end
 			end
 
 			local Default = ListenerBound:Branch("Default")
@@ -901,9 +941,23 @@ function Declarations.Event(Declaration: Parser.Event)
 			Default:End()
 		else
 			if IsSingle then
-				Handler:Compare("Listener", "nil", "Not"):Lines(CallListener.Content, Handler.Indent + 1):End()
+				local Bound = Handler:Compare("Listener", "nil", "Not")
+				if Before then
+					Bound:Line(Before)
+				end
+				Bound:Lines(CallListener.Content, Handler.Indent + 1)
+				if After then
+					Bound:Line(After)
+				end
+				Bound:End()
 			else
+				if Before then
+					Handler:Line(Before)
+				end
 				Handler:Iterator("_", "Listener", ListenersLocal):Lines(CallListener.Content, Handler.Indent + 1):End()
+				if After then
+					Handler:Line(After)
+				end
 			end
 		end
 
@@ -922,7 +976,15 @@ function Declarations.Event(Declaration: Parser.Event)
 		Channel.Listening = true
 
 		local Handler = Blocks.Function(`{HandlersTable}[{Index}]`, PlayerParameter, nil, true)
-		Handler:Line(`Push({Queue}, table.pack({PlayerArgument}{ReadEvent}))`)
+		local Rate = RateCheck(Value.Rate, Name)
+		if Rate then
+			--> Read first: the event's bytes must be consumed even when it is dropped
+			Handler:Line(`local Arguments = table.pack({PlayerArgument}{ReadEvent})`)
+			Handler:Line(`if not {Rate} then return end`)
+			Handler:Line(`Push({Queue}, Arguments)`)
+		else
+			Handler:Line(`Push({Queue}, table.pack({PlayerArgument}{ReadEvent}))`)
+		end
 		Handler:End()
 		HandlerLines.PushLines(Handler.Content, 0, 0)
 
@@ -1081,13 +1143,34 @@ function Declarations.Function(Declaration: Parser.Function)
 		--> Data recieve body
 		Types.u8.Read("InvocationIdentifier", Block)
 		Block:Line(`local {DataValues} = {Util.GetPath(DataIdentifier, false, Scope)}()`)
-			:Compare(Connection, "nil", "Not")
+
+		--> Calls waiting for an answer hold a thread each: an honest client has at most 255
+		Block:Line("local Budget = CurrentBudget")
+		Block:Compare("Budget[4]", "256", "GreaterOrEquals")
+			:Line(`error(\{"TooManyInvocations", "Function \\"{Name}\\""\})`)
+			:End()
+		local Rate = RateCheck(Value.Rate, Name)
+		if Rate then
+			--> Answer a call over its rate with an error, so the caller does not wait forever
+			Block:Compare(Rate, "false", "Equals")
+				:Line(`FailInvocation(Player, {Index}, InvocationIdentifier)`)
+				:Return("")
+				:End()
+		end
+		Block:Line("Budget[4] += 1")
+
+		Block:Compare(Connection, "nil", "Not")
 			:Line(`Spawn({Connection}, Player, {DataArguments}, InvocationIdentifier)`)
 			:Branch("Default")
 			:Compare(`#{Queue}`, "256", "Greater")
 			:Line(`warn("[Blink]: Event queue of \\"{Name}\\" exceeded 256, did you forget to implement a listener?")`)
 			:End()
+			:Compare(`#{Queue}`, "QUEUE_LIMIT", "GreaterOrEquals")
+			:Line(`FailInvocation(Player, {Index}, InvocationIdentifier)`)
+			:Line("Release(Player)")
+			:Branch("Default")
 			:Line(`table.insert({Queue}, \{Player, {DataArguments}, InvocationIdentifier\} :: \{any\})`)
+			:End()
 			:End()
 		Block:End()
 		HandlerLines.PushLines(Block.Content, 0, 0)
@@ -1121,6 +1204,7 @@ function Declarations.Function(Declaration: Parser.Function)
 				:Branch("Default")
 				:Line(`{Util.GetPath(ReturnIdentifier, true, Scope)}({ReturnArguments}, InvocationIdentifier)`)
 				:End()
+				:Line("Release(Player)")
 				:End()
 
 		local Listener = Blocks.Function(Casing.On, `Listener: (Player, {DataTypes}) -> ({ReturnTypes})`, "()", true)
@@ -1245,6 +1329,13 @@ function Declarations.Array(
 			Read:Line(Assert.Lower)
 		end
 		Read:Line(Assert.Upper)
+		if Prefabs.Strict.Sizes then
+			--> Before table.create: a forged length must not make the server allocate a huge table
+			local MinimumBytes = Prefabs.MinimumSize(Of)
+			if MinimumBytes > 0 then
+				Read:Line(`if Length * {MinimumBytes} > buffer.len(RecieveBuffer) - RecieveCursor then error("Array length exceeds the packet") end`)
+			end
+		end
 		LengthType.Write(`#{Variable}`, Write)
 	else
 		Read:Line(`local Length = {Upper}`)
@@ -1808,6 +1899,117 @@ local function Shake(Source: string): string
 	return table.concat(Kept, "\n")
 end
 
+--> The protected per-packet decode loop of the server, and the limits it enforces. Generated
+--> rather than templated because the index width depends on the schema.
+local function GenerateServerReceive(): { string }
+	return {
+		"--> Decodes and dispatches every event of the packet. Runs under xpcall in Receive.\n",
+		"local function Dispatch(Player: Player, Handlers: {[number]: (Player) -> ()}, Size: number): (InvalidPacketReason?, string?)\n",
+		"\twhile RecieveCursor < Size do\n",
+		`\t\tlocal Index = buffer.read{IndexType}(RecieveBuffer, RecieveCursor)\n`,
+		`\t\tRecieveCursor += {IndexBytes}\n`,
+		"\t\tlocal Handler = Handlers[Index]\n",
+		"\t\tif Handler == nil then\n",
+		"\t\t\treturn \"UnknownEvent\", `Event index {Index}`\n",
+		"\t\tend\n",
+		"\t\tlocal Count = EventCount + 1\n",
+		"\t\tEventCount = Count\n",
+		"\t\tif Count > EventLimit then\n",
+		"\t\t\tif Count > MAX_EVENTS_PER_PACKET then\n",
+		"\t\t\t\treturn \"TooManyEvents\", `More than {MAX_EVENTS_PER_PACKET} events`\n",
+		"\t\t\tend\n",
+		"\t\t\treturn \"RateLimited\", \"Events per second\"\n",
+		"\t\tend\n",
+		"\t\tHandler(Player)\n",
+		"\tend\n",
+		"\treturn nil, nil\n",
+		"end\n",
+		"\n",
+		"--> One protected call per packet. A decode error drops the rest of the packet and reports it;\n",
+		"--> a Sync listener's error is reported like any script error and the packet carries on.\n",
+		"local function Receive(Player: Player, Handlers: {[number]: (Player) -> ()}, Budget: {number})\n",
+		"\tlocal Size = buffer.len(RecieveBuffer)\n",
+		"\twhile true do\n",
+		"\t\tlocal Success, Result, Detail = xpcall(Dispatch, Traceback, Player, Handlers, Size)\n",
+		"\t\tif Success then\n",
+		"\t\t\tif Result ~= nil then\n",
+		"\t\t\t\tInvalid(Player, Result :: any, Detail :: string)\n",
+		"\t\t\tend\n",
+		"\t\t\tbreak\n",
+		"\t\telseif ListenerRunning then\n",
+		"\t\t\tListenerRunning = false\n",
+		"\t\t\ttask.spawn(error, Result, 0)\n",
+		"\t\telse\n",
+		"\t\t\tif type(Result) == \"table\" then\n",
+		"\t\t\t\tInvalid(Player, Result[1] :: any, Result[2] :: any)\n",
+		"\t\t\telse\n",
+		"\t\t\t\tInvalid(Player, \"Malformed\", tostring(Result))\n",
+		"\t\t\tend\n",
+		"\t\t\tbreak\n",
+		"\t\tend\n",
+		"\tend\n",
+		"\tBudget[2] -= math.max(EventCount, 1)\n",
+		"end\n",
+		"\n",
+		"--> Answers a client's function call with an error (over its Rate, or the queue is full)\n",
+		"local function FailInvocation(Player: Player, Index: number, Invocation: number)\n",
+		"\tif Player ~= CurrentPlayer then\n",
+		"\t\tUsePlayer(Player)\n",
+		"\tend\n",
+		`\tlocal Position = Allocate({IndexBytes + 2})\n`,
+		`\tbuffer.write{IndexType}(SendBuffer, Position, Index)\n`,
+		`\tbuffer.writeu8(SendBuffer, Position + {IndexBytes}, Invocation)\n`,
+		`\tbuffer.writeu8(SendBuffer, Position + {IndexBytes + 1}, 0)\n`,
+		"end\n",
+	}
+end
+
+--> Limit constants of the server module. 0 in the schema turns a limit off.
+local LIMIT_DEFAULTS = {
+	MaxPacketBytes = 16384,
+	MaxPacketInstances = 256,
+	MaxEventsPerPacket = 256,
+	MaxBytesPerSecond = 65536,
+	MaxEventsPerSecond = 1024,
+}
+--> Large but finite, so refill arithmetic never makes inf * 0 = NaN
+local UNLIMITED = 2 ^ 50
+local SERVER_QUEUE_LIMIT = 1024
+
+local function GenerateLimits(): { string }
+	local function Limit(Name: string): number
+		local Value = (Options :: any)[Name]
+		if Value == nil then
+			Value = LIMIT_DEFAULTS[Name]
+		end
+		return if Value == 0 then UNLIMITED else Value
+	end
+
+	--> One second of the rate, but always room for one packet of the largest allowed size
+	local function Burst(Rate: number, Packet: number): number
+		if Rate >= UNLIMITED or Packet >= UNLIMITED then
+			return Rate
+		end
+		return math.max(Rate, Packet)
+	end
+
+	local PacketBytes = Limit("MaxPacketBytes")
+	local PacketEvents = Limit("MaxEventsPerPacket")
+	local BytesPerSecond = Limit("MaxBytesPerSecond")
+	local EventsPerSecond = Limit("MaxEventsPerSecond")
+	return {
+		`local MAX_PACKET_BYTES = {PacketBytes}\n`,
+		`local MAX_PACKET_INSTANCES = {Limit("MaxPacketInstances")}\n`,
+		`local MAX_EVENTS_PER_PACKET = {PacketEvents}\n`,
+		`local BYTES_PER_SECOND = {BytesPerSecond}\n`,
+		`local BYTES_BURST = {Burst(BytesPerSecond, PacketBytes)}\n`,
+		`local EVENTS_PER_SECOND = {EventsPerSecond}\n`,
+		`local EVENTS_BURST = {Burst(EventsPerSecond, PacketEvents)}\n`,
+		--> What one instance reference costs against the byte budget
+		"local INSTANCE_BYTES = 8\n",
+	}
+end
+
 local Generator = {}
 
 function Generator.Reset()
@@ -1822,6 +2024,7 @@ function Generator.Reset()
 	EnumTables = {}
 	EnumTableCount = 0
 	UsedFactories = {}
+	NextRateSlot = RATE_SLOT_START
 	SendsReliable = false
 	IndexType = "u8"
 	IndexBytes = 1
@@ -1846,6 +2049,10 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 	Context = FileContext
 	Options = AbstractSyntaxTree.Value.Options
 	Casing = Settings.GetCasing((Options.Casing :: Settings.Case) or "Pascal")
+
+	--> Data from clients is hostile: the server's decoders check values the client's do not
+	local IsServer = (Context == "Server")
+	Prefabs.SetStrict(IsServer and Options.ValidateFloats ~= false, IsServer and Options.ValidateStrings ~= false, IsServer)
 
 	--> Setup noop
 	Noop.Push(`if not RunService:IsRunning() then`)
@@ -1880,6 +2087,10 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 	--> Replication
 	local Replication = Builder.new()
 	Return.Push(`{Casing.StepReplication} = StepReplication,`, 1, 1)
+	if Context == "Server" then
+		Return.Push(`{Casing.SetInvalidPacketHandler} = SetInvalidPacketHandler,`, 1, 1)
+		Noop.Push(`{Casing.SetInvalidPacketHandler} = NOOP,`, 0, 2)
+	end
 
 	if not Options.ManualReplication then
 		Replication.Push("RunService.Heartbeat:Connect(StepReplication)")
@@ -1898,7 +2109,38 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 
 	--> Receive connections: read the event index, then jump straight to its handler
 	local Connections = {}
+	local ServerHelpers = {}
+	if Context == "Server" then
+		ServerHelpers = GenerateServerReceive()
+	end
 	for _, Channel in { "Reliable", "Unreliable" } do
+		if Context == "Server" then
+			--> Hostile input: admit, then decode under protection (see Templates/Server SECURITY)
+			table.insert(Connections, `{Channel}.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instances: \{Instance\}?)\n`)
+			table.insert(Connections, "\tlocal Budget = Admit(Player, Buffer, Instances)\n")
+			table.insert(Connections, "\tif Budget == nil then\n\t\treturn\n\tend\n")
+			table.insert(Connections, "\tRecieveCursor = 0\n")
+			table.insert(Connections, "\tRecieveBuffer = Buffer\n")
+			table.insert(Connections, "\tRecieveInstances = Instances or NoInstances\n")
+			table.insert(Connections, "\tRecieveInstanceCursor = 0\n")
+			--> Same yield validation as the client (see EVENT_SYNC_VALIDATION)
+			local Validate = Options.SyncValidation and Channels[Channel].Sync
+			if Options.SyncValidation and (Channels.Reliable.Sync or Channels.Unreliable.Sync) then
+				for Line = 1, #EVENT_SYNC_VALIDATION - 1 do
+					table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[Line]}`)
+				end
+			end
+			if Validate then
+				table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[#EVENT_SYNC_VALIDATION]}`)
+			end
+			table.insert(Connections, `\tReceive(Player, {Channel}Handlers, Budget)\n`)
+			if Validate then
+				table.insert(Connections, `\tSerdesThread = nil\n`)
+			end
+			table.insert(Connections, `end)\n`)
+			continue
+		end
+
 		local Signal = Context == "Client" and "OnClientEvent" or "OnServerEvent"
 		local PlayerParameter = Context == "Server" and "Player: Player, " or ""
 		local PlayerArgument = Context == "Server" and "Player" or ""
@@ -1968,6 +2210,9 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		{ "local SerdesFunctions = {}\n" },
 		{ `local BASE_EVENT_NAME = "{Options.RemoteScope and Options.RemoteScope .. "_" or ""}BLINK"\n` },
 		{ `local REUSE_SEND_BUFFERS = {Options.ReuseSendBuffers == true}\n` },
+		--> Events queued before a listener connects: on the server clients fill them, so bounded
+		{ `local QUEUE_LIMIT = {if Context == "Server" then SERVER_QUEUE_LIMIT else "math.huge"}\n` },
+		(if Context == "Server" then GenerateLimits() else {}),
 		string.split(Sources.Base, "\r"),
 		(if Options.SyncValidation then SYNC_VALIDATION_BODY else {}),
 		(if ReuseSlotCount > 0 then { `local {REUSED_TABLES}: \{[number]: any\} = \{\}\n` } else {}),
@@ -1980,6 +2225,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		Noop.DumpLines(),
 		string.split(Runtime, "\r"),
 		Replication.DumpLines(),
+		ServerHelpers,
 		HandlerLines.DumpLines(),
 		Connections,
 		Factories,
@@ -2006,6 +2252,7 @@ function Generator.GenerateShared(AbstractSyntaxTree: Parser.Body): string
 	Generator.Reset()
 	Context = "Shared"
 	Options = AbstractSyntaxTree.Value.Options
+	Prefabs.SetStrict(false, false, false)
 	Casing = Settings.GetCasing((Options.Casing :: Settings.Case) or "Pascal")
 
 	--> Parse declarations

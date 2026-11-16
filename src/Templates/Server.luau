@@ -76,6 +76,152 @@ SendUnreliableExcept = function(Except: Player, Start: number, InstanceStart: nu
     end
 end
 
+--> SECURITY. Everything a client sends is hostile: an exploiter can call FireServer with any arguments,
+--> any bytes and any instance list, as often as it likes. Every packet goes through Admit
+--> (argument types, size caps, per-player byte and event budgets) before any of it is read,
+--> then is decoded under one xpcall per packet (Receive), so a malformed packet is dropped and
+--> reported instead of throwing into the engine. Limits are the MAX_* and *_PER_SECOND constants.
+export type InvalidPacketReason =
+    "InvalidArguments" --> the remote was called with something other than (buffer, {Instance}?)
+    | "TooLarge" --> more than MaxPacketBytes bytes or MaxPacketInstances instances
+    | "TooManyEvents" --> more than MaxEventsPerPacket events in one packet
+    | "RateLimited" --> over the player's bytes/events per second, or an event's own Rate
+    | "UnknownEvent" --> an event index the server does not listen to
+    | "Malformed" --> did not decode: truncated, out of range, bad enum, NaN, bad UTF-8, wrong instance...
+    | "TooManyInvocations" --> more than 256 function calls waiting for an answer
+
+--> Per player: [1] byte tokens, [2] event tokens, [3] refill clock, [4] function calls in flight,
+--> [5] clock of the last default warning, [6] warnings suppressed since, [7...] per-event Rate
+--> buckets (tokens, clock). Removed on PlayerRemoving; weak keys catch a packet that arrives later.
+local Budgets: {[Player]: {number}} = setmetatable({} :: any, { __mode = "k" })
+local CurrentBudget: {number} = {}
+local EventCount = 0
+local EventLimit = 0
+--> True while a Sync listener runs inside Receive's xpcall: its errors are the game's, not the packet's
+local ListenerRunning = false
+local NoInstances = table.freeze({})
+local InvalidHandler: ((Player: Player, Reason: InvalidPacketReason, Detail: string) -> ())? = nil
+
+local function SetInvalidPacketHandler(Handler: ((Player: Player, Reason: InvalidPacketReason, Detail: string) -> ())?)
+    InvalidHandler = Handler
+end
+
+--> A dropped packet. The game's handler runs on its own thread (it may yield, kick or error);
+--> without one, at most one warning per player every 10 seconds.
+local function Invalid(Player: Player, Reason: InvalidPacketReason, Detail: string)
+    local Handler = InvalidHandler
+    if Handler ~= nil then
+        task.spawn(Handler, Player, Reason, Detail)
+        return
+    end
+
+    local Budget = Budgets[Player]
+    local Now = os.clock()
+    if Budget ~= nil then
+        if Now - Budget[5] < 10 then
+            Budget[6] += 1
+            return
+        end
+        Budget[5] = Now
+    end
+
+    local Suppressed = if Budget ~= nil and Budget[6] > 0 then ` ({Budget[6]} more since the last warning)` else ""
+    if Budget ~= nil then
+        Budget[6] = 0
+    end
+    warn(`[Current]: Dropped a packet from {Player.Name} ({Player.UserId}): {Reason}: {Detail}{Suppressed}`)
+end
+
+--> Checks a packet before any of it is read. Returns the player's budget, or nil to drop it.
+local function Admit(Player: Player, Buffer: any, Instances: any): {number}?
+    ListenerRunning = false
+    local Now = os.clock()
+    local Budget = Budgets[Player]
+    if Budget == nil then
+        Budget = { BYTES_BURST, EVENTS_BURST, Now, 0, -math.huge, 0 }
+        Budgets[Player] = Budget
+    end
+
+    if type(Buffer) ~= "buffer" then
+        Invalid(Player, "InvalidArguments", `Expected a buffer, got {typeof(Buffer)}`)
+        return nil
+    end
+
+    local InstanceCount = 0
+    if Instances ~= nil then
+        if type(Instances) ~= "table" then
+            Invalid(Player, "InvalidArguments", `Expected an instance list, got {typeof(Instances)}`)
+            return nil
+        end
+        InstanceCount = #Instances
+    end
+
+    local Size = buffer.len(Buffer)
+    if Size > MAX_PACKET_BYTES or InstanceCount > MAX_PACKET_INSTANCES then
+        Invalid(Player, "TooLarge", `{Size} bytes, {InstanceCount} instances`)
+        return nil
+    end
+
+    --> Token buckets, refilled by the time since this player's last packet
+    local Elapsed = Now - Budget[3]
+    Budget[3] = Now
+    local Bytes = math.min(BYTES_BURST, Budget[1] + Elapsed * BYTES_PER_SECOND)
+    local Events = math.min(EVENTS_BURST, Budget[2] + Elapsed * EVENTS_PER_SECOND)
+    Budget[2] = Events
+    local Cost = Size + InstanceCount * INSTANCE_BYTES
+    if Cost > Bytes or Events < 1 then
+        Budget[1] = Bytes
+        Invalid(Player, "RateLimited", if Events < 1 then "Events per second" else "Bytes per second")
+        return nil
+    end
+    Budget[1] = Bytes - Cost
+
+    EventCount = 0
+    EventLimit = math.min(Events, MAX_EVENTS_PER_PACKET)
+    CurrentBudget = Budget
+    return Budget
+end
+
+--> xpcall message handler: a listener's error keeps its traceback, a decode error its message
+local function Traceback(Message: any): any
+    if ListenerRunning then
+        return debug.traceback(tostring(Message), 2)
+    end
+    return Message
+end
+
+--> An event's own Rate (events per second per player). Over it, the event is dropped and reported.
+local function Allow(Player: Player, Slot: number, Rate: number, Burst: number, Name: string): boolean
+    local Budget = CurrentBudget
+    local Now = os.clock()
+    local Tokens = Budget[Slot]
+    if Tokens == nil then
+        Tokens = Burst
+    else
+        Tokens = math.min(Burst, Tokens + (Now - Budget[Slot + 1]) * Rate)
+    end
+    Budget[Slot + 1] = Now
+    if Tokens < 1 then
+        Budget[Slot] = Tokens
+        Invalid(Player, "RateLimited", `Event "{Name}"`)
+        return false
+    end
+    Budget[Slot] = Tokens - 1
+    return true
+end
+
+--> A function call was answered: give its in-flight slot back
+local function Release(Player: Player)
+    local Budget = Budgets[Player]
+    if Budget ~= nil and Budget[4] > 0 then
+        Budget[4] -= 1
+    end
+end
+
+Players.PlayerRemoving:Connect(function(Player)
+    Budgets[Player] = nil
+end)
+
 -- RELIABLE --
 --> Reliable traffic. FireAll only appends to the broadcast log (the Home writer),
 --> so its cost does not grow with the player count. A player's own writer only

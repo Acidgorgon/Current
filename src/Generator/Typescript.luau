@@ -323,6 +323,14 @@ return function(FileContext: Context, AbstractSyntaxTree: AbstractSyntaxTree): s
 
 	StringBuilder.Push(VERSION_HEADER)
 	StringBuilder.Push(`export declare const {Casing.StepReplication}: () => void`)
+	if FileContext == "Server" then
+		StringBuilder.Push(
+			`export type InvalidPacketReason = "InvalidArguments" | "TooLarge" | "TooManyEvents" | "RateLimited" | "UnknownEvent" | "Malformed" | "TooManyInvocations"`
+		)
+		StringBuilder.Push(
+			`export declare const {Casing.SetInvalidPacketHandler}: (handler: ((player: Player, reason: InvalidPacketReason, detail: string) => void) | undefined) => void`
+		)
+	end
 
 	if _G.VERSION == nil then
 		StringBuilder.Push(TESTING_HEADER)

@@ -93,25 +93,33 @@ local function Invoke()
     return Invocation
 end
 
-local function Allocate(Bytes: number)
-    local InUse = (SendCursor + Bytes)
-    if InUse > SendSize then
-        --> Grow geometrically; writers keep their capacity between frames
-        local Size = SendSize
-        while InUse > Size do
-            Size *= 2
-        end
-
-        local Buffer = buffer.create(Size)
-        buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
-        SendBuffer = Buffer
-        SendSize = Size
+--> Cold path of Allocate: grows the loaded writer geometrically so it can hold InUse bytes.
+--> Writers keep their capacity between frames.
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Grow
+Grow = function(InUse: number)
+    local Size = SendSize
+    while InUse > Size do
+        Size *= 2
     end
 
-    SendOffset = SendCursor
+    local Buffer = buffer.create(Size)
+    buffer.copy(Buffer, 0, SendBuffer, 0, SendCursor)
+    SendBuffer = Buffer
+    SendSize = Size
+end
+
+local function Allocate(Bytes: number)
+    local Offset = SendCursor
+    local InUse = Offset + Bytes
+    if InUse > SendSize then
+        Grow(InUse)
+    end
+
+    SendOffset = Offset
     SendCursor = InUse
 
-    return SendOffset
+    return Offset
 end
 
 --> Exact-size copy of a saved writer's contents, ready to hand to a remote.

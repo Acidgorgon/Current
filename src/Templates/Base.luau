@@ -111,7 +111,9 @@ local function Allocate(Bytes: number)
 end
 
 --> Exact-size copy of a saved writer's contents, ready to hand to a remote.
-local function Pack(Writer: Writer): buffer
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Pack
+Pack = function(Writer: Writer): buffer
     local Cursor = Writer.Cursor
     local Out = Writer.Out
     if Out == nil or buffer.len(Out) ~= Cursor then
@@ -126,12 +128,16 @@ local function Pack(Writer: Writer): buffer
 end
 
 --> Unreliable sends, FireList and exports serialize into the Scratch writer.
-local function BeginScratch()
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local BeginScratch
+BeginScratch = function()
     Save(Home)
     Load(Scratch)
 end
 
-local function EndScratch()
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local EndScratch
+EndScratch = function()
     Scratch.Cursor = 0
     Scratch.Size = SendSize
     Scratch.Buffer = SendBuffer
@@ -155,7 +161,9 @@ local function ListenerLoop()
     end
 end
 
-local function Spawn(Listener: (...any) -> (), ...)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local Spawn
+Spawn = function(Listener: (...any) -> (), ...)
     if FreeThread == nil then
         FreeThread = coroutine.create(ListenerLoop)
         coroutine.resume(FreeThread :: thread)
@@ -213,6 +221,60 @@ local Queue: any = {
     Reliable = {},
     Unreliable = {}
 }
+
+--> Cold path: an event arrived before any listener was connected
+local QueueEvent
+QueueEvent = function(EventQueue: {any}, Name: string, ...: any)
+    if #EventQueue > 256 then
+        warn(`[Blink]: Event queue of "{Name}" exceeded 256, did you forget to implement a listener?`)
+    end
+    table.insert(EventQueue, table.pack(...))
+end
+
+local function FlushQueue(Channel: string, Index: number, Listener: (...any) -> (), Sync: boolean)
+    local EventQueue = Queue[Channel][Index]
+    if EventQueue == nil or #EventQueue == 0 then
+        return
+    end
+
+    Queue[Channel][Index] = {}
+    for _, Arguments in EventQueue do
+        if Sync then
+            Listener(table.unpack(Arguments, 1, Arguments.n))
+        else
+            Spawn(Listener, table.unpack(Arguments, 1, Arguments.n))
+        end
+    end
+end
+
+--> On() for every event is built from these two factories at load time, so all events
+--> share one function prototype instead of compiling their own copy.
+local function ConnectMany(Channel: string, Index: number, Sync: boolean): any
+    return function(Listener: (...any) -> ()): () -> ()
+        local Listeners = Events[Channel][Index]
+        table.insert(Listeners, Listener)
+        FlushQueue(Channel, Index, Listener, Sync)
+        return function()
+            local Position = table.find(Listeners, Listener)
+            if Position ~= nil then
+                table.remove(Listeners, Position)
+            end
+        end
+    end
+end
+
+local function ConnectSingle(Channel: string, Index: number, Sync: boolean): any
+    return function(Listener: (...any) -> ()): () -> ()
+        local Listeners = Events[Channel]
+        Listeners[Index] = Listener
+        FlushQueue(Channel, Index, Listener, Sync)
+        return function()
+            if Listeners[Index] == Listener then
+                Listeners[Index] = nil
+            end
+        end
+    end
+end
 
 local ReliableHandlers: {[number]: (...any) -> ()} = {}
 local UnreliableHandlers: {[number]: (...any) -> ()} = {}

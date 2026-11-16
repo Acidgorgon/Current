@@ -451,11 +451,7 @@ function Declarations.Event(Declaration: Parser.Event)
 			end
 
 			ListenerBound:Branch("Default")
-				:Line(`local EventQueue = {Queue}`)
-				:Compare(`#EventQueue`, "256", "Greater")
-				:Line(`warn("[Blink]: Event queue of \\"{Name}\\" exceeded 256, did you forget to implement a listener?")`)
-				:End()
-				:Line(`table.insert(EventQueue, \{{ListenerArguments}\} :: \{any\})`)
+				:Line(`QueueEvent({Queue}, "{Name}", {ListenerArguments})`)
 				:End()
 		else
 			if IsSingle then
@@ -468,31 +464,10 @@ function Declarations.Event(Declaration: Parser.Event)
 		Handler:End()
 		HandlerLines.PushLines(Handler.Content, 0, 0)
 
-		--> On
-		local Disconnect = Blocks.Function("", "", "()")
-		if IsSingle then
-			Disconnect = Disconnect:Compare(Connection, "Listener", "Equals"):Line(`{Connection} = nil`):End()
-		else
-			Disconnect = Disconnect:Line(`local Index = table.find({Connection}, Listener)`)
-			Disconnect = Disconnect:Compare("Index", "nil", "Not"):Line(`table.remove({Connection}, Index)`):End()
-		end
-		Disconnect = Disconnect:End():Wrap("return ", "")
-
-		local Listener = Blocks.Function(Casing.On, ContextArguments, `() -> ()`, true)
-			:Line(IsSingle and `{Connection} = Listener` or `table.insert({Connection}, Listener)`)
-
-		if IsReliable then
-			--> Flush anything that arrived before a listener was connected
-			Listener = Listener:Line(`local EventQueue = {Queue}`)
-				:Compare("#EventQueue", "0", "Greater")
-				:Line(`{Queue} = \{}`)
-				:Iterator("_", "Arguments", "EventQueue")
-				:Line(IsSync and `Listener(table.unpack(Arguments))` or `Spawn(Listener, table.unpack(Arguments))`)
-				:End()
-				:End()
-		end
-
-		Listener = Listener:Lines(Disconnect.Content, 1):End()
+		--> On: built by a shared factory, cast to this event's listener type
+		local Factory = IsSingle and "ConnectSingle" or "ConnectMany"
+		local Listener = Blocks.Block()
+		Listener:Line(`{Casing.On} = {Factory}("{Reliability}", {Index}, {IsSync and "true" or "false"}) :: ({ContextArguments}) -> () -> ()`, 0)
 
 		table.insert(Members, Listener:Wrap("", ",").Content)
 		table.insert(NoopMembers, `{Casing.On} = NOOP,\n`)

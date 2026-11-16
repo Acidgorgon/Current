@@ -29,7 +29,9 @@ end
 --> them (copied in lazily by CatchUp) so ordering is preserved.
 local PlayersMap: {[Player]: Writer} = {}
 
-local function CreateWriter(Player: Player, Synced: number, SyncedInstances: number): Writer
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local CreateWriter
+CreateWriter = function(Player: Player, Synced: number, SyncedInstances: number): Writer
     local Writer = NewWriter()
     Writer.Synced = Synced
     Writer.SyncedInstances = SyncedInstances
@@ -43,7 +45,9 @@ end
 
 --> Appends the part of the broadcast log the loaded writer has not seen yet.
 --> Home must be saved before calling.
-local function CatchUp(Writer: Writer)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local CatchUp
+CatchUp = function(Writer: Writer)
     local Synced = Writer.Synced
     local Count = Home.Cursor - Synced
     if Count > 0 then
@@ -62,7 +66,9 @@ local function CatchUp(Writer: Writer)
 end
 
 --> Loads a player's writer with the broadcast log caught up. Pair with EndPlayer.
-local function BeginPlayer(Player: Player): Writer
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local BeginPlayer
+BeginPlayer = function(Player: Player): Writer
     Save(Home)
     local Writer = PlayersMap[Player] or CreateWriter(Player, 0, 0)
     Load(Writer)
@@ -70,13 +76,17 @@ local function BeginPlayer(Player: Player): Writer
     return Writer
 end
 
-local function EndPlayer(Writer: Writer)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local EndPlayer
+EndPlayer = function(Writer: Writer)
     Save(Writer)
     Load(Home)
 end
 
 --> FireExcept: catch the excluded player up to the log, then mark them as past the new event
-local function BeginExcept(Except: Player): Writer?
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local BeginExcept
+BeginExcept = function(Except: Player): Writer?
     local Writer = PlayersMap[Except]
     if Writer ~= nil then
         Save(Home)
@@ -88,7 +98,9 @@ local function BeginExcept(Except: Player): Writer?
     return Writer
 end
 
-local function EndExcept(Writer: Writer?)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local EndExcept
+EndExcept = function(Writer: Writer?)
     if Writer ~= nil then
         Writer.Synced = SendCursor
         Writer.SyncedInstances = #SendInstances
@@ -96,7 +108,9 @@ local function EndExcept(Writer: Writer?)
 end
 
 --> FireList (reliable): the event was serialized once into Scratch, append it to each player
-local function SendReliableList(List: {Player})
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendReliableList
+SendReliableList = function(List: {Player})
     Save(Scratch)
     local Size, Source, Instances = SendCursor, SendBuffer, SendInstances
     local InstanceCount = #Instances
@@ -115,19 +129,25 @@ local function SendReliableList(List: {Player})
 end
 
 --> Unreliable sends: the event was serialized into Scratch
-local function SendUnreliable(Player: Player)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliable
+SendUnreliable = function(Player: Player)
     Save(Scratch)
     Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
     EndScratch()
 end
 
-local function SendUnreliableAll()
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableAll
+SendUnreliableAll = function()
     Save(Scratch)
     Unreliable:FireAllClients(Pack(Scratch), SendInstances)
     EndScratch()
 end
 
-local function SendUnreliableList(List: {Player})
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableList
+SendUnreliableList = function(List: {Player})
     Save(Scratch)
     local Buffer = Pack(Scratch)
     for _, Player in List do
@@ -136,7 +156,9 @@ local function SendUnreliableList(List: {Player})
     EndScratch()
 end
 
-local function SendUnreliableExcept(Except: Player)
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local SendUnreliableExcept
+SendUnreliableExcept = function(Except: Player)
     Save(Scratch)
     local Buffer = Pack(Scratch)
     for _, Player in Players:GetPlayers() do
@@ -147,11 +169,15 @@ local function SendUnreliableExcept(Except: Player)
     EndScratch()
 end
 
-for _, Player in Players:GetPlayers() do
-    if PlayersMap[Player] == nil then
-        CreateWriter(Player, 0, 0)
+--> In a function: a loop in the module's main chunk would make it compile natively
+local function AddExistingPlayers()
+    for _, Player in Players:GetPlayers() do
+        if PlayersMap[Player] == nil then
+            CreateWriter(Player, 0, 0)
+        end
     end
 end
+AddExistingPlayers()
 
 Players.PlayerAdded:Connect(function(Player)
     --> Players that join mid-frame skip broadcasts sent before they joined

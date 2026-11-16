@@ -13,7 +13,12 @@ local Unreliable: UnreliableRemoteEvent = ReplicatedStorage:WaitForChild(BASE_EV
 local SendUnreliable
 SendUnreliable = function()
     Save(Scratch)
-    Unreliable:FireServer(Pack(Scratch), SendInstances)
+    --> The instance array is left out when empty (see the server's sends)
+    if #SendInstances > 0 then
+        Unreliable:FireServer(Pack(Scratch), SendInstances)
+    else
+        Unreliable:FireServer(Pack(Scratch))
+    end
     EndScratch()
 end
 
@@ -23,7 +28,11 @@ local function StepReplication()
     end
 
     Save(Home)
-    Reliable:FireServer(Pack(Home), SendInstances)
+    if #SendInstances > 0 then
+        Reliable:FireServer(Pack(Home), SendInstances)
+    else
+        Reliable:FireServer(Pack(Home))
+    end
 
     Home.Cursor = 0
     table.clear(Home.Instances)

@@ -23,12 +23,18 @@ if not Unreliable then
     Unreliable = UnreliableRemoteEvent
 end
 
---> Unreliable sends: the event was serialized into Scratch
+--> Unreliable sends: the event was serialized into Scratch.
+--> Every send leaves out the instance array when it is empty: an empty table would still
+--> be serialized by the remote and rebuilt by the receiver on every packet.
 --> Declared then assigned so the compiler does not inline it into every event (native code size)
 local SendUnreliable
 SendUnreliable = function(Player: Player)
     Save(Scratch)
-    Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
+    if #SendInstances > 0 then
+        Unreliable:FireClient(Player, Pack(Scratch), SendInstances)
+    else
+        Unreliable:FireClient(Player, Pack(Scratch))
+    end
     EndScratch()
 end
 
@@ -36,7 +42,11 @@ end
 local SendUnreliableAll
 SendUnreliableAll = function()
     Save(Scratch)
-    Unreliable:FireAllClients(Pack(Scratch), SendInstances)
+    if #SendInstances > 0 then
+        Unreliable:FireAllClients(Pack(Scratch), SendInstances)
+    else
+        Unreliable:FireAllClients(Pack(Scratch))
+    end
     EndScratch()
 end
 
@@ -45,8 +55,13 @@ local SendUnreliableList
 SendUnreliableList = function(List: {Player})
     Save(Scratch)
     local Buffer = Pack(Scratch)
+    local Instances = if #SendInstances > 0 then SendInstances else nil
     for _, Player in List do
-        Unreliable:FireClient(Player, Buffer, SendInstances)
+        if Instances then
+            Unreliable:FireClient(Player, Buffer, Instances)
+        else
+            Unreliable:FireClient(Player, Buffer)
+        end
     end
     EndScratch()
 end
@@ -56,9 +71,14 @@ local SendUnreliableExcept
 SendUnreliableExcept = function(Except: Player)
     Save(Scratch)
     local Buffer = Pack(Scratch)
+    local Instances = if #SendInstances > 0 then SendInstances else nil
     for _, Player in Players:GetPlayers() do
         if Player ~= Except then
-            Unreliable:FireClient(Player, Buffer, SendInstances)
+            if Instances then
+                Unreliable:FireClient(Player, Buffer, Instances)
+            else
+                Unreliable:FireClient(Player, Buffer)
+            end
         end
     end
     EndScratch()
@@ -241,7 +261,11 @@ local function StepReplication()
     if not Private then
         --> Nobody has private data this frame: one FireAllClients covers everyone
         if BroadcastSize > 0 then
-            Reliable:FireAllClients(Pack(Home), BroadcastInstances)
+            if #BroadcastInstances > 0 then
+                Reliable:FireAllClients(Pack(Home), BroadcastInstances)
+            else
+                Reliable:FireAllClients(Pack(Home))
+            end
         end
     else
         Private = false
@@ -255,7 +279,11 @@ local function StepReplication()
                     if Broadcast == nil then
                         Broadcast = Pack(Home)
                     end
-                    Reliable:FireClient(Player, Broadcast, BroadcastInstances)
+                    if BroadcastInstanceCount > 0 then
+                        Reliable:FireClient(Player, Broadcast, BroadcastInstances)
+                    else
+                        Reliable:FireClient(Player, Broadcast)
+                    end
                 end
                 continue
             end
@@ -271,17 +299,20 @@ local function StepReplication()
             Writer.SyncedInstances = 0
 
             if Cursor > 0 then
-                local Instances = Writer.Instances
+                local Out: buffer
                 if REUSE_SEND_BUFFERS then
-                    Reliable:FireClient(Player, Pack(Writer), Instances)
+                    Out = Pack(Writer)
                 else
-                    local Out = buffer.create(Cursor)
+                    Out = buffer.create(Cursor)
                     buffer.copy(Out, 0, Writer.Buffer, 0, Cursor)
-                    Reliable:FireClient(Player, Out, Instances)
                 end
                 Writer.Cursor = 0
+                local Instances = Writer.Instances
                 if #Instances > 0 then
+                    Reliable:FireClient(Player, Out, Instances)
                     table.clear(Instances)
+                else
+                    Reliable:FireClient(Player, Out)
                 end
             end
         end

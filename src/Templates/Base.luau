@@ -272,6 +272,10 @@ QueueEvent = function(EventQueue: {any}, Name: string, ...: any)
     if #EventQueue > 256 then
         warn(`[Blink]: Event queue of "{Name}" exceeded 256, did you forget to implement a listener?`)
     end
+    --> On the server clients fill the queue: it is bounded so nobody can grow it forever
+    if #EventQueue >= QUEUE_LIMIT then
+        return
+    end
     table.insert(EventQueue, table.pack(...))
 end
 

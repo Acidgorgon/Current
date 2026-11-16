@@ -1,0 +1,75 @@
+-- Schema for the hostile-client test (Hostile.luau): every type a client can send, plus
+-- events and functions shaped for the crafted attacks. Limits are the defaults.
+option ManualReplication = true
+option ServerOutput = "../../Network/Security/Server.luau"
+option ClientOutput = "../../Network/Security/Client.luau"
+
+enum Small = { A, B, C }
+enum Big = { V0, V1, V2, V3, V4, V5, V6, V7 }
+set Flags = { F1, F2, F3, F4, F5, F6, F7, F8, F9, F10 }
+
+struct Inner {
+	Id: u16(1..1000),
+	Name: string(1..16),
+	Tags: Small[0..4],
+}
+
+enum Shape = "Type" {
+	Circle { Radius: f32 },
+	Square { Side: u16, Corner: vector<i16> },
+	Label { Text: string(0..32), Inner: Inner? },
+}
+
+struct Everything {
+	U8: u8,
+	U16: u16(10..20),
+	U32: u32,
+	I8: i8,
+	I16: i16(-5..5),
+	I32: i32,
+	F16: f16,
+	F32: f32,
+	F64: f64,
+	Bounded: f32(-1..1),
+	Bool: boolean,
+	Str: string,
+	Fixed: string(4),
+	Bytes: buffer(0..64),
+	Vec: vector,
+	VecI: vector<i16>,
+	VecR: vector(0..10),
+	Frame: CFrame,
+	Color: Color3,
+	When: DateTime,
+	WhenMs: DateTimeMillis,
+	Brick: BrickColor,
+	Part: Instance(BasePart),
+	Any: Instance,
+	MaybePart: Instance(BasePart)?,
+	Kind: Small,
+	Wide: Big,
+	Flags: Flags,
+	Map: map { [string(1..8)]: u8 },
+	Nested: Inner[0..8],
+	Three: f32[3],
+	Opt: u8?,
+	OptInner: Inner?,
+	Shape: Shape,
+}
+
+event Everything { From: Client, Type: Reliable, Call: SingleSync, Data: Everything }
+event Input { From: Client, Type: Unreliable, Call: ManySync, Data: (u8, vector, f32) }
+event Chat { From: Both, Type: Reliable, Call: ManyAsync, Data: string(0..200) }
+event Shapes { From: Client, Type: Unreliable, Call: SingleAsync, Data: Shape[0..4] }
+event Arr { From: Client, Type: Reliable, Call: SingleSync, Data: u16[0..60000] }
+event Blob { From: Client, Type: Reliable, Call: SingleSync, Data: buffer(0..60000) }
+event Touch { From: Client, Type: Reliable, Call: SingleSync, Data: Instance(BasePart) }
+event Thing { From: Client, Type: Reliable, Call: SingleSync, Data: unknown }
+event Boom { From: Client, Type: Reliable, Call: ManySync, Data: u8 }
+event Limited { From: Client, Type: Reliable, Call: SingleSync, Data: u8, Rate: 5 }
+event Polled { From: Client, Type: Reliable, Call: Polling, Data: u16(0..1000) }
+event Unheard { From: Client, Type: Reliable, Call: SingleSync, Data: u8 }
+event ServerOnly { From: Server, Type: Reliable, Call: SingleAsync, Data: u8 }
+function Ask { Yield: Coroutine, Data: u8, Return: u8 }
+function Slow { Yield: Coroutine, Data: u8, Return: u8 }
+function Unanswered { Yield: Coroutine, Data: u8, Return: u8 }

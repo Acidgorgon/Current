@@ -59,9 +59,13 @@ It means lower bandwidth usage directly resulting in **lower ping\*** experience
 Upstream Blink's Studio benchmarks are [here](./benchmark/Benchmarks.md).
 
 # Security
-Current does two things to combat bad actors:
-1. Data sent by clients will be **validated** on the receiving side before reaching any critical game code.
-2. As a result of the compression done by Current it becomes **significantly harder** to snoop on your game's network traffic. Long gone are the days of skids using RemoteSpy to snoop on your game's traffic.
+The server treats everything a client sends as hostile:
+1. **Validation.** Data sent by clients is checked against the schema before it reaches a listener: ranges, lengths, enums, instance classes, and by default finite floats and valid UTF-8. A malformed packet is dropped and reported; it never throws into the engine.
+2. **Limits.** Per-player caps on packet size, events per packet, bytes and events per second, function calls in flight, and optional per-event rates, all on by default and configurable.
+3. **Reporting.** `SetInvalidPacketHandler` tells your game which player sent what kind of bad packet, so it can log or kick.
+4. **Obscurity, on top.** Packed buffers and per-schema shuffled event indexes make traffic harder to snoop on and break copy-pasted scripts across updates. This is not a defense on its own.
+
+See [Security](./docs/guide/security.md) for the threat model, the checks, the limits and their defaults, and what is still your game's job.
 
 # Get Started
 Read the documentation at **https://acidgorgon.github.io/Current/**: start with [installation](https://acidgorgon.github.io/Current/guide/installation), then [getting started](https://acidgorgon.github.io/Current/guide/getting-started) and the [schema language reference](https://acidgorgon.github.io/Current/reference/schema). Coming from Blink? See [Migrating from Blink](https://acidgorgon.github.io/Current/guide/migrating-from-blink).

@@ -40,6 +40,25 @@ local HALF_FLOAT = 2
 local FLOAT = 4
 local DOUBLE = 8
 
+--> Extra checks on data received from clients, only in the server module (see SetStrict).
+--> The client trusts the server and pays nothing for these.
+local Strict = {
+	Floats = false, --> reject NaN and +-inf
+	Strings = false, --> reject invalid UTF-8
+	Sizes = false, --> check wire-supplied lengths against the bytes left before allocating
+}
+
+local FLOAT_TYPES = { f16 = true, f32 = true, f64 = true }
+
+--> x - x is 0 for every finite number and NaN for NaN and +-inf
+local function NonFiniteCheck(Variables: { string }): string
+	local Terms = {}
+	for _, Variable in Variables do
+		table.insert(Terms, `({Variable} - {Variable})`)
+	end
+	return `if {table.concat(Terms, " + ")} ~= 0 then error("Expected a finite number") end`
+end
+
 local Types = {}
 local Asserts = {
 	float = function(Variable: string, Min: number, Max: number): AssertPrefab
@@ -159,6 +178,18 @@ local function GeneratePrimitivePrefab(Type: string, Prefab: TypePrefab, AssertG
 
 			if not AssertGenerator then
 				return
+			end
+
+			if Block == Read and Strict.Floats and FLOAT_TYPES[Primitive] then
+				--> A range with finite bounds already rejects NaN and +-inf
+				local Bounded = Range ~= nil and Range.Min > -math.huge and Range.Max < math.huge
+				if not Bounded then
+					Block:Line(NonFiniteCheck({ Variable }))
+				end
+			end
+
+			if Block == Read and Strict.Strings and Primitive == "string" then
+				Block:Line(`if utf8.len({Variable}) == nil then error("Expected a valid UTF-8 string") end`)
 			end
 
 			if Range then
@@ -352,6 +383,9 @@ do
 			Prefab.Read("X", Block)
 			Prefab.Read("Y", Block)
 			Prefab.Read("Z", Block)
+			if Strict.Floats and (Components == nil or FLOAT_TYPES[Components[#Components]]) then
+				Block:Line(NonFiniteCheck({ "X", "Y", "Z" }))
+			end
 			Block:Line(`{Block:Declare(Variable)} = Vector3.new(X, Y, Z)`)
 		end,
 		Write = function(Value: string, Block: Block, _, Components: { string }?)
@@ -387,6 +421,10 @@ do
 			local Upper = Range and Range.Max or (2 ^ 16 - 1)
 			local LengthType = GetTypeToUse(Upper)
 			LengthType.Read("Length", Block)
+			if Strict.Sizes then
+				--> Before buffer.create, so a forged length cannot make the server allocate it
+				Block:Line(`if Length > buffer.len({RECIEVE_BUFFER}) - RecieveCursor then error("Buffer length exceeds the packet") end`)
+			end
 			Block:Line(`{Block:Declare(Variable)} = buffer.create(Length)`)
 			Block:Line(`buffer.copy({Variable}, 0, {RECIEVE_BUFFER}, Read(Length), Length)`)
 		end,
@@ -424,6 +462,9 @@ do
 			Prefab.Read("rX", Block)
 			Prefab.Read("rY", Block)
 			Prefab.Read("rZ", Block)
+			if Strict.Floats and (Components == nil or FLOAT_TYPES[Components[1]]) then
+				Block:Line(NonFiniteCheck({ "rX", "rY", "rZ" }))
+			end
 			Block:Line(`{Block:Declare(Variable)} = CFrame.new(Position) * CFrame.fromOrientation(rX, rY, rZ)`)
 		end,
 		Write = function(Value: string, Block: Block, _, Components: { string }?)
@@ -476,6 +517,12 @@ do
 	Types.DateTime = {
 		Read = function(Variable: string, Block: Block)
 			local UnixTimestamp = Block:Read(DOUBLE)
+			if Strict.Floats then
+				Block:Line(`{Block:Declare("Timestamp")} = buffer.readf64({RECIEVE_BUFFER}, {UnixTimestamp})`)
+				Block:Line(NonFiniteCheck({ "Timestamp" }))
+				Block:Line(`{Block:Declare(Variable)} = DateTime.fromUnixTimestamp(Timestamp)`)
+				return
+			end
 			Block:Line(
 				`{Block:Declare(Variable)} = DateTime.fromUnixTimestamp(buffer.readf64({RECIEVE_BUFFER}, {UnixTimestamp}))`
 			)
@@ -497,6 +544,12 @@ do
 	Types.DateTimeMillis = {
 		Read = function(Variable: string, Block: Block)
 			local UnixTimestampMillis = Block:Read(DOUBLE)
+			if Strict.Floats then
+				Block:Line(`{Block:Declare("Timestamp")} = buffer.readf64({RECIEVE_BUFFER}, {UnixTimestampMillis})`)
+				Block:Line(NonFiniteCheck({ "Timestamp" }))
+				Block:Line(`{Block:Declare(Variable)} = DateTime.fromUnixTimestampMillis(Timestamp)`)
+				return
+			end
 			Block:Line(
 				`{Block:Declare(Variable)} = DateTime.fromUnixTimestampMillis(buffer.readf64({RECIEVE_BUFFER}, {UnixTimestampMillis}))`
 			)
@@ -570,7 +623,101 @@ do
 	}
 end
 
+local function SetStrict(Floats: boolean, Strings: boolean, Sizes: boolean)
+	Strict.Floats = Floats
+	Strict.Strings = Strings
+	Strict.Sizes = Sizes
+end
+
+--> Bytes on the wire of each primitive, before any variable-size part
+local COMPONENT_BYTES = { u8 = 1, i8 = 1, u16 = 2, i16 = 2, f16 = 2, u32 = 4, i32 = 4, f32 = 4, f64 = 8 }
+local FIXED_BYTES = { boolean = 1, Color3 = 3, DateTime = 8, DateTimeMillis = 8, BrickColor = 2 }
+
+--> The fewest bytes and instance slots a value of this type can take on the wire
+local function MinimumSize(Declaration: any): (number, number)
+	local Kind = Declaration.Type
+	local Value = Declaration.Value
+	if Kind == "Primitive" then
+		local Primitive = Declaration.Tokens.Primitive.Value
+		local Range = Value.Range
+		local Components = Value.Components
+		if COMPONENT_BYTES[Primitive] then
+			return COMPONENT_BYTES[Primitive], 0
+		elseif FIXED_BYTES[Primitive] then
+			return FIXED_BYTES[Primitive], 0
+		elseif Primitive == "string" or Primitive == "buffer" then
+			if Range and Range.Min == Range.Max then
+				return Range.Min, 0
+			end
+			local Upper = Range and Range.Max or (2 ^ 16 - 1)
+			local Prefix = if Upper <= 255 then 1 elseif Upper <= 65535 then 2 else 4
+			return Prefix + (Range and Range.Min or 0), 0
+		elseif Primitive == "vector" then
+			local Component = Components and Components[#Components] or "f32"
+			return 3 * (COMPONENT_BYTES[Component] or 4), 0
+		elseif Primitive == "CFrame" then
+			local Position = Components and Components[#Components] or "f32"
+			local Rotation = Components and Components[1] or "f32"
+			return 3 * (COMPONENT_BYTES[Position] or 4) + 3 * (COMPONENT_BYTES[Rotation] or 4), 0
+		elseif Primitive == "Instance" or Primitive == "unknown" then
+			return 0, 1
+		end
+		return 0, 0
+	elseif Kind == "Enum" or Kind == "Optional" then
+		if Kind == "Optional" then
+			local Of = Value.Of
+			if Of.Type == "Primitive" and Of.Tokens.Primitive.Value == "Instance" then
+				return 0, 1
+			end
+		end
+		return 1, 0
+	elseif Kind == "Map" then
+		return 2, 0
+	elseif Kind == "Set" then
+		local Bytes = 0
+		local Remaining = #Value.Values
+		while Remaining > 0 do
+			local Partition = math.min(Remaining, 32)
+			Bytes += if Partition <= 8 then 1 elseif Partition <= 16 then 2 else 4
+			Remaining -= Partition
+		end
+		return Bytes, 0
+	elseif Kind == "Struct" or Kind == "Tuple" then
+		local Bytes, Instances = 0, 0
+		for _, Field in Value.Values do
+			local FieldBytes, FieldInstances = MinimumSize(Field)
+			Bytes += FieldBytes
+			Instances += FieldInstances
+		end
+		return Bytes, Instances
+	elseif Kind == "TagEnum" then
+		local Bytes, Instances = math.huge, math.huge
+		for _, Variant in Value.Values do
+			local VariantBytes, VariantInstances = MinimumSize(Variant)
+			Bytes = math.min(Bytes, VariantBytes)
+			Instances = math.min(Instances, VariantInstances)
+		end
+		if Bytes == math.huge then
+			Bytes, Instances = 0, 0
+		end
+		return 1 + Bytes, Instances
+	elseif Kind == "Array" then
+		local Range = Value.Range
+		local Count = Range and Range.Min or 0
+		local Bytes, Instances = MinimumSize(Value.Of)
+		local Prefix = 0
+		if Range and Range.Min ~= Range.Max then
+			Prefix = if Range.Max <= 255 then 1 elseif Range.Max <= 65535 then 2 else 4
+		end
+		return Prefix + Count * Bytes, Count * Instances
+	end
+	return 0, 0
+end
+
 return {
+	Strict = Strict,
+	SetStrict = SetStrict,
+	MinimumSize = MinimumSize,
 	Types = Types,
 	Asserts = Asserts,
 	Primitives = Primitives,

@@ -1187,7 +1187,10 @@ function Declarations.Array(
 		LengthType.Read("Length", Read)
 		local Assert = Prefabs.Asserts.integer("Length", Lower, Upper)
 
-		Read:Line(Assert.Lower)
+		--> The length is read unsigned: a lower bound of 0 needs no check
+		if Lower > 0 then
+			Read:Line(Assert.Lower)
+		end
 		Read:Line(Assert.Upper)
 		LengthType.Write(`#{Variable}`, Write)
 	else

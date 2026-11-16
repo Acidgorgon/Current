@@ -166,7 +166,14 @@ local function GeneratePrimitivePrefab(Type: string, Prefab: TypePrefab, AssertG
 				if not IsVariableSize and Assert.Exact then
 					Block:Line(Assert.Exact)
 				else
-					Block:Line(Assert.Lower)
+					--> Reads of unsigned numbers and of lengths are never negative: a lower bound
+					--> of 0 needs no check there (floats keep it, it also rejects NaN)
+					local NeverNegative = Block == Read
+						and Range.Min <= 0
+						and (Type == "string" or Type == "buffer" or Primitive == "u8" or Primitive == "u16" or Primitive == "u32")
+					if not NeverNegative then
+						Block:Line(Assert.Lower)
+					end
 					Block:Line(Assert.Upper)
 				end
 			elseif Primitive == "Instance" and Class then

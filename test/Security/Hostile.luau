@@ -110,7 +110,7 @@ local function ServerRemote(Name: string)
 	local Remote = { OnServerEvent = Signal() }
 	function Remote:FireClient(Player, Buffer, Instances)
 		ToClient[Player] = ToClient[Player] or {}
-		table.insert(ToClient[Player], { Remote = Name, Buffer = CopyBuffer(Buffer), Instances = table.clone(Instances) })
+		table.insert(ToClient[Player], { Remote = Name, Buffer = CopyBuffer(Buffer), Instances = if Instances then table.clone(Instances) else nil })
 	end
 	function Remote:FireAllClients(Buffer, Instances)
 		for _, Player in Players do
@@ -143,7 +143,7 @@ for Name, Channel in { BLINK_RELIABLE_REMOTE = "Reliable", BLINK_UNRELIABLE_REMO
 	ClientRemotes[Name] = {
 		OnClientEvent = Signal(),
 		FireServer = function(_, Buffer, Instances)
-			table.insert(Outbox, { Remote = Channel, Buffer = CopyBuffer(Buffer), Instances = table.clone(Instances) })
+			table.insert(Outbox, { Remote = Channel, Buffer = CopyBuffer(Buffer), Instances = if Instances then table.clone(Instances) else nil })
 		end,
 	}
 end

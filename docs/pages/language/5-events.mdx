@@ -82,6 +82,9 @@ blink.MyEvent.FireAll(5)
 blink.MyEvent.FireList({Player}, 5)
 blink.MyEvent.FireExcept(Player, 5)
 ```
+Reliable events reach each player in the order they were fired, whichever mix of `Fire`, `FireAll`,
+`FireList` and `FireExcept` sent them. A reliable send to a player who has already left
+(after `Players.PlayerRemoving`) is dropped.
 
 ### Listening to an Event
 ```lua filename="client.luau" copy

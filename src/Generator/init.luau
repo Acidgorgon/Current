@@ -2265,6 +2265,7 @@ function Generator.GenerateShared(AbstractSyntaxTree: Parser.Body): string
 		VERSION_HEADER,
 		string.split(Source[1], "\r"),
 		{ `local REUSE_SEND_BUFFERS = {Options.ReuseSendBuffers == true}\n` },
+		{ "local QUEUE_LIMIT = math.huge\n" },
 		string.split(Sources.Base, "\r"),
 		LuauTypes.DumpLines(),
 		{ "\n" },

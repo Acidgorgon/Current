@@ -47,10 +47,15 @@ local SYNC_VALIDATION_BODY = {
 	"local SerdesThread: thread?\n",
 }
 
+--> SerdesThread is cleared once a packet is fully dispatched, so it is only still set when
+--> the last dispatch did not finish: a Sync listener yielded (or errored, then the thread is dead)
 local EVENT_SYNC_VALIDATION = {
-	`if SerdesThread and coroutine.status(SerdesThread) == "suspended" then\n`,
-	'\twarn(`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)\n',
-	"\tcoroutine.close(SerdesThread)\n",
+	"if SerdesThread ~= nil then\n",
+	'\tif coroutine.status(SerdesThread) == "suspended" then\n',
+	'\t\twarn(`[Blink]: Yielded in a Sync call. Event "{SerdesEvent}" uses a Sync call, consider using an Async call instead.`)\n',
+	"\t\tcoroutine.close(SerdesThread)\n",
+	"\tend\n",
+	"\tSerdesThread = nil\n",
 	"end\n",
 	"SerdesThread = coroutine.running()\n",
 }
@@ -199,9 +204,10 @@ local SendsReliable = false
 local RELIABLE_MARKER = "-- RELIABLE --\n"
 local ENUM_TABLES_MARKER = "-- ENUM TABLES --\n"
 
-local Channels: { [string]: { Count: number, Listening: boolean } } = {
-	Reliable = { Count = 0, Listening = false },
-	Unreliable = { Count = 0, Listening = false },
+--> Sync: whether this side listens to a Sync event on the channel (needs yield validation)
+local Channels: { [string]: { Count: number, Listening: boolean, Sync: boolean } } = {
+	Reliable = { Count = 0, Listening = false, Sync = false },
+	Unreliable = { Count = 0, Listening = false, Sync = false },
 }
 
 local Types = Prefabs.Types
@@ -532,6 +538,9 @@ function Declarations.Event(Declaration: Parser.Event)
 		end
 
 		Channel.Listening = true
+		if IsSync then
+			Channel.Sync = true
+		end
 
 		local ContextArguments = `Listener: ({Context == "Server" and "Player: Player, " or ""}{Values}) -> ()`
 		local ListenerArguments = `{PlayerArgument}{Arguments}`
@@ -1412,6 +1421,8 @@ function Generator.Reset()
 	Channels.Unreliable.Count = 0
 	Channels.Reliable.Listening = false
 	Channels.Unreliable.Listening = false
+	Channels.Reliable.Sync = false
+	Channels.Unreliable.Sync = false
 end
 
 function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Body): string
@@ -1472,10 +1483,16 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		for _, Line in EVENT_BODY do
 			table.insert(Connections, `\t{Line}`)
 		end
-		if Options.SyncValidation then
-			for _, Line in EVENT_SYNC_VALIDATION do
-				table.insert(Connections, `\t{Line}`)
+		--> Every channel closes a thread left suspended by a Sync listener (it would resume
+		--> mid-packet), but only channels with Sync listeners pay for coroutine.running()
+		local Validate = Options.SyncValidation and Channels[Channel].Sync
+		if Options.SyncValidation and (Channels.Reliable.Sync or Channels.Unreliable.Sync) then
+			for Line = 1, #EVENT_SYNC_VALIDATION - 1 do
+				table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[Line]}`)
 			end
+		end
+		if Validate then
+			table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[#EVENT_SYNC_VALIDATION]}`)
 		end
 		table.insert(Connections, `\tlocal Handlers = {Channel}Handlers\n`)
 		table.insert(Connections, `\twhile RecieveCursor < Size do\n`)
@@ -1487,6 +1504,9 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		table.insert(Connections, `\t\tend\n`)
 		table.insert(Connections, `\t\tHandler({PlayerArgument})\n`)
 		table.insert(Connections, `\tend\n`)
+		if Validate then
+			table.insert(Connections, `\tSerdesThread = nil\n`)
+		end
 		table.insert(Connections, `end)\n`)
 	end
 

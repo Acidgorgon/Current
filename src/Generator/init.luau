@@ -248,10 +248,61 @@ local RELIABLE_MARKER = "-- RELIABLE --\n"
 local ENUM_TABLES_MARKER = "-- ENUM TABLES --\n"
 
 --> Sync: whether this side listens to a Sync event on the channel (needs yield validation)
-local Channels: { [string]: { Count: number, Listening: boolean, Sync: boolean } } = {
-	Reliable = { Count = 0, Listening = false, Sync = false },
-	Unreliable = { Count = 0, Listening = false, Sync = false },
+--> Order: the shuffled wire indexes (ShuffleEventIds), or nil for declaration order
+type Channel = { Count: number, Listening: boolean, Sync: boolean, Order: { number }? }
+local Channels: { [string]: Channel } = {
+	Reliable = { Count = 0, Listening = false, Sync = false, Order = nil },
+	Unreliable = { Count = 0, Listening = false, Sync = false, Order = nil },
 }
+
+--> The wire index of the channel's next event or function. With ShuffleEventIds the
+--> declaration order goes through a fixed permutation (see ShuffleOrder).
+local function NextIndex(Channel: Channel): number
+	local Order = Channel.Order
+	if Order then
+		return Order[Channel.Count + 1]
+	end
+	return Channel.Count
+end
+
+--> FNV-1a (32 bit), continuing from Hash
+local function HashText(Text: string, Hash: number): number
+	for Index = 1, #Text do
+		Hash = bit32.bxor(Hash, string.byte(Text, Index))
+		Hash = (bit32.lshift(Hash, 24) + Hash * 403) % 4294967296
+	end
+	return Hash
+end
+
+--> A deterministic permutation of 0 .. Count - 1 (Fisher-Yates driven by xorshift32). The seed
+--> is the schema's token hash, so a schema always compiles to the same indexes and they move
+--> only when the schema (or EventIdSeed) changes. This is obscurity, not security: it breaks
+--> scripts that hardcode "byte N = event X" across schema changes and nothing more.
+local function ShuffleOrder(Count: number, SchemaHash: number, Seed: string, ChannelName: string): { number }
+	local State = HashText(ChannelName .. "\0" .. Seed, SchemaHash)
+	if State == 0 then
+		State = 0x9E3779B9
+	end
+
+	local function Next(): number
+		State = bit32.bxor(State, bit32.lshift(State, 13))
+		State = bit32.bxor(State, bit32.rshift(State, 17))
+		State = bit32.bxor(State, bit32.lshift(State, 5))
+		return State
+	end
+
+	local Order = table.create(Count)
+	for Index = 1, Count do
+		Order[Index] = Index - 1
+	end
+
+	for Index = Count, 2, -1 do
+		local Other = Next() % Index + 1
+		Order[Index], Order[Other] = Order[Other], Order[Index]
+	end
+
+	return Order
+end
 
 local Types = Prefabs.Types
 local Primitives = Prefabs.Primitives
@@ -727,7 +778,7 @@ function Declarations.Event(Declaration: Parser.Event)
 	local Channel = IsUnreliable and Channels.Unreliable or Channels.Reliable
 	local HandlersTable = IsUnreliable and "UnreliableHandlers" or "ReliableHandlers"
 
-	local Index = Channel.Count
+	local Index = NextIndex(Channel)
 	local Queue = `Queue.{Reliability}[{Index}]`
 	local Connection = `Events.{Reliability}[{Index}]`
 	--> The receive handlers find their listeners through a local alias of Events.<Channel>
@@ -984,7 +1035,7 @@ function Declarations.Function(Declaration: Parser.Function)
 		SendsReliable = true
 	end
 
-	local Index = Channel.Count
+	local Index = NextIndex(Channel)
 	local Queue = `Queue.Reliable[{Index}]`
 	local Connection = `Events.Reliable[{Index}]`
 
@@ -1784,6 +1835,8 @@ function Generator.Reset()
 	Channels.Unreliable.Listening = false
 	Channels.Reliable.Sync = false
 	Channels.Unreliable.Sync = false
+	Channels.Reliable.Order = nil
+	Channels.Unreliable.Order = nil
 end
 
 function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Body): string
@@ -1804,6 +1857,15 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 	if math.max(ReliableCount, UnreliableCount) > 256 then
 		IndexType = "u16"
 		IndexBytes = 2
+	end
+
+	--> Shuffled wire indexes (on unless ShuffleEventIds = false). Client and server are made
+	--> from the same tree, so both sides get the same permutation.
+	if Options.ShuffleEventIds ~= false then
+		local Hash = AbstractSyntaxTree.Value.Hash or 0
+		local Seed = Options.EventIdSeed or ""
+		Channels.Reliable.Order = ShuffleOrder(ReliableCount, Hash, Seed, "Reliable")
+		Channels.Unreliable.Order = ShuffleOrder(UnreliableCount, Hash, Seed, "Unreliable")
 	end
 
 	--> Import async libraries

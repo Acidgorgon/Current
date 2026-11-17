@@ -248,8 +248,15 @@ local function Release(Player: Player)
     end
 end
 
+--> Lighthouse: players in the game (how many get a FireAll)
+local LhPlayers = #Players:GetPlayers()
+Players.PlayerAdded:Connect(function()
+    LhPlayers += 1
+end)
+
 Players.PlayerRemoving:Connect(function(Player)
     Budgets[Player] = nil
+    LhPlayers -= 1
 end)
 
 -- RELIABLE --
@@ -414,6 +421,10 @@ Players.PlayerRemoving:Connect(function(Player)
 end)
 
 local function StepReplication()
+    local L = Lh
+    if L then
+        LhFlush:begin()
+    end
     Save(Current)
     Current = Home
     CurrentPlayer = nil
@@ -484,6 +495,11 @@ local function StepReplication()
     Home.Cursor = 0
     table.clear(BroadcastInstances)
     Load(Home)
+    if L then
+        LhReport()
+        LhFlush:finish()
+    end
+    LhFrame()
 end
 -- RELIABLE --
 ]]

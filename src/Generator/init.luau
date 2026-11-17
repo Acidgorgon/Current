@@ -143,86 +143,132 @@ local FIRE_FACTORY_ORDER = {
 }
 local FIRE_FACTORIES = {
 	Server = {
-		ReliableFire1 = [[local function ReliableFire1(Write: (any) -> ()): any
+		--> Server methods also take the event's name for Lighthouse (see LhWrote in Templates/Base)
+		ReliableFire1 = [[local function ReliableFire1(Write: (any) -> (), Name: string): any
     return function(Player: Player, Value: any)
         if Player ~= CurrentPlayer then
             UsePlayer(Player)
         end
+        if Lh then
+            local Start = SendCursor
+            Write(Value)
+            LhWrote(Name, SendCursor - Start, Player, 1)
+            return
+        end
         Write(Value)
     end
 end
 ]],
-		ReliableFire = [[local function ReliableFire(Write: (...any) -> ()): any
+		ReliableFire = [[local function ReliableFire(Write: (...any) -> (), Name: string): any
     return function(Player: Player, ...)
         if Player ~= CurrentPlayer then
             UsePlayer(Player)
         end
+        if Lh then
+            local Start = SendCursor
+            Write(...)
+            LhWrote(Name, SendCursor - Start, Player, 1)
+            return
+        end
         Write(...)
     end
 end
 ]],
-		ReliableFireAll1 = [[local function ReliableFireAll1(Write: (any) -> ()): any
+		ReliableFireAll1 = [[local function ReliableFireAll1(Write: (any) -> (), Name: string): any
     return function(Value: any)
         if Current ~= Home then
             Switch(Home)
+        end
+        if Lh then
+            local Start = SendCursor
+            Write(Value)
+            LhWrote(Name, SendCursor - Start, nil, LhPlayers)
+            return
         end
         Write(Value)
     end
 end
 ]],
-		ReliableFireAll = [[local function ReliableFireAll(Write: (...any) -> ()): any
+		ReliableFireAll = [[local function ReliableFireAll(Write: (...any) -> (), Name: string): any
     return function(...)
         if Current ~= Home then
             Switch(Home)
+        end
+        if Lh then
+            local Start = SendCursor
+            Write(...)
+            LhWrote(Name, SendCursor - Start, nil, LhPlayers)
+            return
         end
         Write(...)
     end
 end
 ]],
-		ReliableFireList = [[local function ReliableFireList(Write: (...any) -> ()): any
+		ReliableFireList = [[local function ReliableFireList(Write: (...any) -> (), Name: string): any
     return function(List: {Player}, ...)
         BeginScratch()
         Write(...)
+        if Lh then
+            LhWrote(Name, SendCursor, nil, #List)
+        end
         SendReliableList(List)
     end
 end
 ]],
-		ReliableFireExcept = [[local function ReliableFireExcept(Write: (...any) -> ()): any
+		ReliableFireExcept = [[local function ReliableFireExcept(Write: (...any) -> (), Name: string): any
     return function(Except: Player, ...)
         local Writer = BeginExcept(Except)
-        Write(...)
+        if Lh then
+            local Start = SendCursor
+            Write(...)
+            LhWrote(Name, SendCursor - Start, nil, if Writer ~= nil then LhPlayers - 1 else LhPlayers)
+        else
+            Write(...)
+        end
         EndExcept(Writer)
     end
 end
 ]],
-		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> ()): any
+		UnreliableFire = [[local function UnreliableFire(Write: (...any) -> (), Name: string): any
     return function(Player: Player, ...)
         local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
+        if Lh then
+            LhWrote(Name, SendCursor - Start, Player, 1)
+        end
         SendUnreliable(Player, Start, InstanceStart)
     end
 end
 ]],
-		UnreliableFireAll = [[local function UnreliableFireAll(Write: (...any) -> ()): any
+		UnreliableFireAll = [[local function UnreliableFireAll(Write: (...any) -> (), Name: string): any
     return function(...)
         local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
+        if Lh then
+            LhWrote(Name, SendCursor - Start, nil, LhPlayers)
+        end
         SendUnreliableAll(Start, InstanceStart)
     end
 end
 ]],
-		UnreliableFireList = [[local function UnreliableFireList(Write: (...any) -> ()): any
+		UnreliableFireList = [[local function UnreliableFireList(Write: (...any) -> (), Name: string): any
     return function(List: {Player}, ...)
         local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
+        if Lh then
+            LhWrote(Name, SendCursor - Start, nil, #List)
+        end
         SendUnreliableList(List, Start, InstanceStart)
     end
 end
 ]],
-		UnreliableFireExcept = [[local function UnreliableFireExcept(Write: (...any) -> ()): any
+		UnreliableFireExcept = [[local function UnreliableFireExcept(Write: (...any) -> (), Name: string): any
     return function(Except: Player, ...)
         local Start, InstanceStart = SendCursor, #SendInstances
         Write(...)
+        if Lh then
+            LhWrote(Name, SendCursor - Start, nil, LhPlayers - 1)
+        end
         SendUnreliableExcept(Except, Start, InstanceStart)
     end
 end
@@ -259,6 +305,14 @@ end
 --> sends the server keeps no per-player writers and StepReplication has nothing to do.
 local SendsReliable = false
 local RELIABLE_MARKER = "-- RELIABLE --\n"
+--> StepReplication of a server that sends nothing reliable: only the Lighthouse report
+local STEP_WITHOUT_RELIABLE = [[local function StepReplication()
+    if Lh then
+        LhReport()
+    end
+    LhFrame()
+end
+]]
 local ENUM_TABLES_MARKER = "-- ENUM TABLES --\n"
 
 --> Sync: whether this side listens to a Sync event on the channel (needs yield validation)
@@ -805,7 +859,10 @@ function Declarations.Event(Declaration: Parser.Event)
 
 	--> Data body
 	local Types, Values, Arguments, _ = "nil", "Value: nil", "Value", nil
-	local Read, Write = Generators.Event(Value.Data, Index, Identifier, nil, ReuseSlots)
+	--> Lighthouse channel name (Scope.Name) and the receive side's name for this wire index
+	local LhName = `{Util.GetScopePrefix(nil, true, Scope)}{Name}`
+	Events.Push(`LhNames{Reliability}[{Index}] = "{LhName}"`)
+	local Read, Write = Generators.Event(Value.Data, Index, Identifier, nil, ReuseSlots, LhName)
 
 	if Value.Data then
 		Types, Values, _, Arguments = Generators.LuauType(Value.Data :: Type, true)
@@ -1027,7 +1084,7 @@ function Declarations.Event(Declaration: Parser.Event)
 		local Expression = Writer
 		if Factory then
 			UsedFactories[Factory] = true
-			Expression = `{Factory}({Writer})`
+			Expression = if Context == "Server" then `{Factory}({Writer}, "{LhName}")` else `{Factory}({Writer})`
 		end
 		table.insert(Members, { `{FunctionName} = {Expression} :: ({Parameters}) -> (),\n` })
 		table.insert(NoopMembers, `{FunctionName} = NOOP,\n`)
@@ -1098,6 +1155,8 @@ function Declarations.Function(Declaration: Parser.Function)
 	end
 
 	local Index = NextIndex(Channel)
+	local LhName = `{Util.GetScopePrefix(nil, true, Scope)}{Name}`
+	Events.Push(`LhNamesReliable[{Index}] = "{LhName}"`)
 	local Queue = `Queue.Reliable[{Index}]`
 	local Connection = `Events.Reliable[{Index}]`
 
@@ -1114,7 +1173,7 @@ function Declarations.Function(Declaration: Parser.Function)
 	end
 
 	do
-		local DataRead, DataWrite = Generators.Event(Value.Data :: Type, Index, DataIdentifier, "Data")
+		local DataRead, DataWrite = Generators.Event(Value.Data :: Type, Index, DataIdentifier, "Data", nil, LhName)
 		local ReturnRead, ReturnWrite = Generators.Event(Value.Return :: Type, Index, ReturnIdentifier, "Return")
 
 		if Context == "Client" then
@@ -1202,7 +1261,13 @@ function Declarations.Function(Declaration: Parser.Function)
 				:Line(`buffer.writeu8(SendBuffer, Position + {IndexBytes + 1}, 0)`)
 				:Line(`warn(\`"{Name}" encountered an error, \{Error\}\`)`)
 				:Branch("Default")
-				:Line(`{Util.GetPath(ReturnIdentifier, true, Scope)}({ReturnArguments}, InvocationIdentifier)`)
+				:Line("if Lh then")
+				:Line("local Start = SendCursor", 3)
+				:Line(`{Util.GetPath(ReturnIdentifier, true, Scope)}({ReturnArguments}, InvocationIdentifier)`, 3)
+				:Line(`LhWrote("{LhName}", SendCursor - Start, Player, 1)`, 3)
+				:Line("else")
+				:Line(`{Util.GetPath(ReturnIdentifier, true, Scope)}({ReturnArguments}, InvocationIdentifier)`, 3)
+				:Line("end")
 				:End()
 				:Line("Release(Player)")
 				:End()
@@ -1713,7 +1778,8 @@ function Generators.Event(
 	Index: number,
 	Identifier: string,
 	Function: ("Data" | "Return")?,
-	ReuseSlots: { string }?
+	ReuseSlots: { string }?,
+	LhName: string?
 ): ({ string }, { string })
 	local Type, Values, _, Returns = "nil", "Value: nil", nil, "nil"
 	if Data then
@@ -1748,6 +1814,12 @@ function Generators.Event(
 		else
 			Generators.UserType(Data, Read, Write)
 		end
+	end
+
+	--> Lighthouse, client: the record runs from the function's first block (the index) to the cursor.
+	--> The server reports from its Fire methods instead, which know who the record goes to.
+	if LhName and Context == "Client" then
+		Write:Line(`if Lh then LhWrote("{LhName}", SendCursor - BLOCK_START, nil, 1) end`)
 	end
 
 	return Read:Return(Returns):End().Content, Write:End().Content
@@ -1921,6 +1993,9 @@ local function GenerateServerReceive(): { string }
 		"\t\t\treturn \"RateLimited\", \"Events per second\"\n",
 		"\t\tend\n",
 		"\t\tHandler(Player)\n",
+		"\t\tif Lh then\n",
+		"\t\t\tLhRead(Handlers, Index, RecieveCursor)\n",
+		"\t\tend\n",
 		"\tend\n",
 		"\treturn nil, nil\n",
 		"end\n",
@@ -2105,7 +2180,7 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 	local Runtime = Source[2]
 	local Sections = string.split(Runtime, RELIABLE_MARKER)
 	if #Sections == 3 then
-		Runtime = Sections[1] .. (if SendsReliable then Sections[2] else "local function StepReplication() end\n") .. Sections[3]
+		Runtime = Sections[1] .. (if SendsReliable then Sections[2] else STEP_WITHOUT_RELIABLE) .. Sections[3]
 	end
 
 	--> Receive connections: read the event index, then jump straight to its handler
@@ -2119,7 +2194,13 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 			--> Hostile input: admit, then decode under protection (see Templates/Server SECURITY)
 			table.insert(Connections, `{Channel}.OnServerEvent:Connect(function(Player: Player, Buffer: buffer, Instances: \{Instance\}?)\n`)
 			table.insert(Connections, "\tlocal Budget = Admit(Player, Buffer, Instances)\n")
-			table.insert(Connections, "\tif Budget == nil then\n\t\treturn\n\tend\n")
+			table.insert(Connections, "\tlocal L = Lh\n")
+			table.insert(Connections, "\tif Budget == nil then\n")
+			table.insert(Connections, "\t\tif L and type(Buffer) == \"buffer\" then\n")
+			table.insert(Connections, "\t\t\tLhReceived(L, buffer.len(Buffer), Player)\n")
+			table.insert(Connections, "\t\tend\n")
+			table.insert(Connections, "\t\treturn\n\tend\n")
+			table.insert(Connections, "\tif L then\n\t\tLhReceive:begin()\n\tend\n")
 			table.insert(Connections, "\tRecieveCursor = 0\n")
 			table.insert(Connections, "\tRecieveBuffer = Buffer\n")
 			table.insert(Connections, "\tRecieveInstances = Instances or NoInstances\n")
@@ -2138,6 +2219,10 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 			table.insert(Connections, `\tif not Success or Result ~= nil then\n`)
 			table.insert(Connections, `\t\tRecover(Player, {Channel}Handlers, Success, Result, Detail)\n`)
 			table.insert(Connections, `\tend\n`)
+			table.insert(Connections, "\tif L then\n")
+			table.insert(Connections, "\t\tLhReceived(L, buffer.len(Buffer), Player)\n")
+			table.insert(Connections, "\t\tLhReceive:finish()\n")
+			table.insert(Connections, "\tend\n")
 			--> Every packet costs at least one event token, so empty packets cannot flood for free
 			table.insert(Connections, `\tBudget[2] -= math.max(EventCount, 1)\n`)
 			if Validate then
@@ -2166,6 +2251,8 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 			table.insert(Connections, `\t{EVENT_SYNC_VALIDATION[#EVENT_SYNC_VALIDATION]}`)
 		end
 		table.insert(Connections, `\tlocal Handlers = {Channel}Handlers\n`)
+		table.insert(Connections, "\tlocal L = Lh\n")
+		table.insert(Connections, "\tif L then\n\t\tLhReceive:begin()\n\tend\n")
 		table.insert(Connections, `\twhile RecieveCursor < Size do\n`)
 		table.insert(Connections, `\t\tlocal Index = buffer.read{IndexType}(RecieveBuffer, RecieveCursor)\n`)
 		table.insert(Connections, `\t\tRecieveCursor += {IndexBytes}\n`)
@@ -2174,7 +2261,14 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 		table.insert(Connections, `\t\t\tbreak\n`)
 		table.insert(Connections, `\t\tend\n`)
 		table.insert(Connections, `\t\tHandler({PlayerArgument})\n`)
+		table.insert(Connections, "\t\tif L then\n")
+		table.insert(Connections, "\t\t\tLhRead(Handlers, Index, RecieveCursor)\n")
+		table.insert(Connections, "\t\tend\n")
 		table.insert(Connections, `\tend\n`)
+		table.insert(Connections, "\tif L then\n")
+		table.insert(Connections, `\t\tLhReceived(L, Size, {if PlayerArgument ~= "" then "Player" else "nil"})\n`)
+		table.insert(Connections, "\t\tLhReceive:finish()\n")
+		table.insert(Connections, "\tend\n")
 		if Validate then
 			table.insert(Connections, `\tSerdesThread = nil\n`)
 		end
@@ -2184,7 +2278,10 @@ function Generator.Generate(FileContext: Context, AbstractSyntaxTree: Parser.Bod
 	local Factories = {}
 	for _, Name in FIRE_FACTORY_ORDER do
 		if UsedFactories[Name] then
-			table.insert(Factories, FIRE_FACTORIES[Context][Name])
+			--> Declared then assigned: at -O2 a `local function` factory is inlined at every call,
+			--> which copies the method's prototype into each event (code size)
+			local Source = string.gsub(FIRE_FACTORIES[Context][Name], "^local function (%w+)%(", "local %1\n%1 = function(")
+			table.insert(Factories, Source)
 		end
 	end
 

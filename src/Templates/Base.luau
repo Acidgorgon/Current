@@ -327,4 +327,161 @@ end
 local ReliableHandlers: {[number]: (...any) -> ()} = {}
 local UnreliableHandlers: {[number]: (...any) -> ()} = {}
 
+--> Lighthouse hooks (https://acidgorgon.github.io/Lighthouse/). Lighthouse sets shared.Lighthouse;
+--> StepReplication reads it once per frame (LhFrame). Only while it is set: every send reports the
+--> size of the record it wrote (LhWrote: the server's Fire methods, the client's serializers), each
+--> receive loop the size of every event it read (LhRead), and the totals go to Lighthouse.net once
+--> per frame (sends) or per packet (receives), one channel per event. Without Lighthouse the cost
+--> is that lookup and an `if` per event.
+local Lh: any = nil
+local LhSeen: any = nil
+local LhFlush: any = nil
+local LhReceive: any = nil
+--> Bytes per event name since the last report, and the names that have some
+local LhOut: {[string]: number} = {}
+local LhOutNames: {string} = {}
+local LhOutCount = 0
+--> Server: bytes per player and event name (one table per player, kept while the player is)
+local LhPrivate: {[any]: {[string]: number}} = setmetatable({} :: any, { __mode = "k" })
+local LhPrivatePlayers: {any} = {}
+local LhPrivateNames: {string} = {}
+local LhPrivateCount = 0
+--> Receive: bytes per event name in the packet being read, and where the last event ended
+local LhIn: {[string]: number} = {}
+local LhInNames: {string} = {}
+local LhInCount = 0
+local LhInTotal = 0
+local LhPosition = 0
+--> Event names by channel and wire index (filled by the generated code)
+local LhNamesReliable: {[number]: string} = {}
+local LhNamesUnreliable: {[number]: string} = {}
+local LhNames = { [ReliableHandlers] = LhNamesReliable, [UnreliableHandlers] = LhNamesUnreliable }
+
+--> Once per frame, at the end of StepReplication. Probes are fetched again only when
+--> shared.Lighthouse changes.
+--> Declared then assigned so the compiler does not inline it (native code size)
+local LhFrame
+LhFrame = function()
+    local Shared = shared
+    local Api = if Shared ~= nil then Shared.Lighthouse else nil
+    if Api ~= LhSeen then
+        LhSeen = Api
+        LhFlush = nil
+        LhReceive = nil
+        if Api ~= nil then
+            local Ok, Flush, Receive = pcall(function()
+                return Api.probe("Current.Flush"), Api.probe("Current.Receive")
+            end)
+            if Ok then
+                LhFlush = Flush
+                LhReceive = Receive
+            end
+        end
+    end
+    Lh = if LhFlush ~= nil then Api else nil
+end
+
+--> Adds Bytes to Totals[Name]; a name that had none goes on Names. Returns the new count of Names.
+--> Declared then assigned so the compiler does not inline it (native code size)
+local LhAdd
+LhAdd = function(Totals: {[string]: number}, Names: {string}, Count: number, Name: string, Bytes: number): number
+    local Old = Totals[Name]
+    if Old == nil or Old == 0 then
+        Count += 1
+        Names[Count] = Name
+        Totals[Name] = Bytes
+    else
+        Totals[Name] = Old + Bytes
+    end
+    return Count
+end
+
+--> Reports and clears Totals for the first Count names of Names
+--> Declared then assigned so the compiler does not inline it (native code size)
+local LhSend
+LhSend = function(Api: any, Totals: {[string]: number}, Names: {string}, Count: number, Direction: string, Player: any)
+    for Index = 1, Count do
+        local Name = Names[Index]
+        local Bytes = Totals[Name]
+        if Bytes > 0 then
+            Totals[Name] = 0
+            Api.net("Current", Name, Direction, Bytes, Player)
+        end
+    end
+end
+
+--> A record of Bytes bytes for event Name was written for one player (To), or for Times players
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local LhWrote
+LhWrote = function(Name: string, Bytes: number, To: any, Times: number)
+    if To == nil then
+        if Bytes * Times > 0 then
+            LhOutCount = LhAdd(LhOut, LhOutNames, LhOutCount, Name, Bytes * Times)
+        end
+        return
+    end
+    local Totals = LhPrivate[To]
+    if Totals == nil then
+        Totals = {}
+        LhPrivate[To] = Totals
+    end
+    local Old = Totals[Name]
+    if Old == nil or Old == 0 then
+        LhPrivateCount += 1
+        LhPrivatePlayers[LhPrivateCount] = To
+        LhPrivateNames[LhPrivateCount] = Name
+        Totals[Name] = Bytes
+    else
+        Totals[Name] = Old + Bytes
+    end
+end
+
+--> Sends the bytes written since the last report (once per frame, from StepReplication)
+--> Declared then assigned so the compiler does not inline it (native code size)
+local LhReport
+LhReport = function()
+    local Api = Lh
+    LhSend(Api, LhOut, LhOutNames, LhOutCount, "out", nil)
+    LhOutCount = 0
+    for Index = 1, LhPrivateCount do
+        local Player = LhPrivatePlayers[Index]
+        LhPrivatePlayers[Index] = nil
+        local Totals = LhPrivate[Player]
+        if Totals ~= nil then
+            local Name = LhPrivateNames[Index]
+            local Bytes = Totals[Name]
+            if Bytes > 0 then
+                Totals[Name] = 0
+                Api.net("Current", Name, "out", Bytes, Player)
+            end
+        end
+    end
+    LhPrivateCount = 0
+end
+
+--> A receive loop read an event that ends at Cursor
+--> Declared then assigned so the compiler does not inline it into every event (native code size)
+local LhRead
+LhRead = function(Handlers: any, Index: number, Cursor: number)
+    local Bytes = Cursor - LhPosition
+    LhPosition = Cursor
+    LhInTotal += Bytes
+    LhInCount = LhAdd(LhIn, LhInNames, LhInCount, LhNames[Handlers][Index] or "?", Bytes)
+end
+
+--> A packet of Size bytes was read: report its events. Bytes no event accounts for (a packet
+--> that was dropped or failed to decode) go to the "Dropped" channel.
+--> Declared then assigned so the compiler does not inline it (native code size)
+local LhReceived
+LhReceived = function(Api: any, Size: number, Player: any)
+    LhSend(Api, LhIn, LhInNames, LhInCount, "in", Player)
+    LhInCount = 0
+    local Rest = Size - LhInTotal
+    LhInTotal = 0
+    LhPosition = 0
+    if Rest > 0 then
+        Api.net("Current", "Dropped", "in", Rest, Player)
+    end
+end
+
 ]]

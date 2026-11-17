@@ -23,19 +23,26 @@ SendUnreliable = function(Start: number, InstanceStart: number)
 end
 
 local function StepReplication()
-    if SendCursor <= 0 then
-        return
+    local L = Lh
+    if L then
+        LhFlush:begin()
     end
+    if SendCursor > 0 then
+        Save(Home)
+        if #SendInstances > 0 then
+            Reliable:FireServer(Pack(Home), SendInstances)
+        else
+            Reliable:FireServer(Pack(Home))
+        end
 
-    Save(Home)
-    if #SendInstances > 0 then
-        Reliable:FireServer(Pack(Home), SendInstances)
-    else
-        Reliable:FireServer(Pack(Home))
+        Home.Cursor = 0
+        table.clear(Home.Instances)
+        Load(Home)
     end
-
-    Home.Cursor = 0
-    table.clear(Home.Instances)
-    Load(Home)
+    if L then
+        LhReport()
+        LhFlush:finish()
+    end
+    LhFrame()
 end
 ]]

@@ -1,0 +1,15 @@
+-- Schema for the Lighthouse hook test (Lighthouse.luau): every way an event can be sent.
+option ManualReplication = true
+option ServerOutput = "../../Network/Lighthouse/Server.luau"
+option ClientOutput = "../../Network/Lighthouse/Client.luau"
+
+event Score { From: Server, Type: Reliable, Call: ManySync, Data: (u16, string(0..32)) }
+event Inventory { From: Server, Type: Reliable, Call: ManySync, Data: u32[0..64] }
+event Snapshot { From: Server, Type: Unreliable, Call: ManySync, Data: (u8, f32) }
+event Input { From: Client, Type: Unreliable, Call: ManySync, Data: u8 }
+event Chat { From: Both, Type: Reliable, Call: ManySync, Data: string(0..200) }
+function Ask { Yield: Coroutine, Data: u8, Return: u8 }
+
+scope Shop {
+	event Buy { From: Client, Type: Reliable, Call: ManySync, Data: u16 }
+}

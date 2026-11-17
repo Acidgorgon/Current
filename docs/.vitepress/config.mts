@@ -48,6 +48,7 @@ export default defineConfig({
             { text: 'Migrating from Blink', link: '/guide/migrating-from-blink' },
             { text: 'Performance', link: '/guide/performance' },
             { text: 'Security', link: '/guide/security' },
+            { text: 'Profiling with Lighthouse', link: '/guide/profiling' },
             { text: 'Using with RBX Forge', link: '/guide/rbx-forge' },
           ],
         },

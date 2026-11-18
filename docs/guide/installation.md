@@ -14,7 +14,7 @@ Or add the line yourself under `[tools]` in `rokit.toml` and run `rokit install`
 
 ```toml [rokit.toml]
 [tools]
-current = "Acidgorgon/current@0.1.1"
+current = "Acidgorgon/current@0.1.2"
 ```
 
 Check that it works:

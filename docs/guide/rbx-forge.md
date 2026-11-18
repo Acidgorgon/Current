@@ -14,7 +14,7 @@ Forge rewrites that line of the game's `rokit.toml` in place:
 # before
 blink = "1Axen/blink@0.18.1"
 # after
-current = "Acidgorgon/current@0.1.1"
+current = "Acidgorgon/current@0.1.2"
 ```
 
 and runs `rokit install`. Current is a vetted tool in Forge, so it installs without rokit's trust prompt. Pressing **Switch** on Blink switches back the same way.

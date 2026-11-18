@@ -31,7 +31,7 @@ What Current adds on top of Blink:
 With [rokit](https://github.com/rojo-rbx/rokit), run `rokit add Acidgorgon/current`, or add this line under `[tools]` in your `rokit.toml`:
 
 ```toml
-current = "Acidgorgon/current@0.1.1"
+current = "Acidgorgon/current@0.1.2"
 ```
 
 Or download the archive for your platform from the [Releases](https://github.com/Acidgorgon/current/releases) page, extract it and put the `current` executable (`current.exe` on Windows) on your `PATH`.

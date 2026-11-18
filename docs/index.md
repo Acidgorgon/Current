@@ -51,7 +51,7 @@ rokit add Acidgorgon/current
 
 ```toml [rokit.toml]
 [tools]
-current = "Acidgorgon/current@0.1.1"
+current = "Acidgorgon/current@0.1.2"
 ```
 
 :::
